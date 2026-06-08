@@ -1,5 +1,5 @@
 """
-ingestion.py - FINAL ROBUST VERSION
+ingestion.py - FINAL ROBUST VERSION (Value Research Primary)
 """
 
 import re
@@ -39,39 +39,34 @@ def scrape_valueresearch(vr_url: str) -> dict:
     result = {"source": "Value Research", "url": vr_url}
     try:
         r = _get(vr_url)
-        soup = BeautifulSoup(r.text, "lxml")
         text = r.text
 
-        # NAV
-        nav_match = re.search(r'Current NAV.*?₹?([\d,]+\.\d{2})', text, re.I)
+        # NAV - exact pattern from VR
+        nav_match = re.search(r'The latest declared NAV of .*? is ₹?([\d,]+\.\d{2})', text, re.I)
         if nav_match:
             nav = float(nav_match.group(1).replace(",", ""))
             if nav > 0:
                 result["nav"] = nav
 
-        # AUM - Multiple patterns
-        aum_match = re.search(r'AUM.*?₹?([\d,]+\.?\d*)\s*Cr', text, re.I)
+        # AUM - exact pattern
+        aum_match = re.search(r'The fund has an overall AUM.*?₹?([\d,]+\.?\d*)\s*Cr', text, re.I)
         if aum_match:
             result["aum_raw"] = f"₹{aum_match.group(1)} Cr"
-        else:
-            aum_match2 = re.search(r'₹?([\d,]+\.?\d*)\s*Cr', text, re.I)
-            if aum_match2:
-                result["aum_raw"] = f"₹{aum_match2.group(1)} Cr"
 
-        # Expense Ratio - Multiple patterns
-        exp_match = re.search(r'Expense Ratio.*?(\d+\.\d+)%', text, re.I)
+        # Expense Ratio - exact pattern
+        exp_match = re.search(r'The fund has an expense ratio of (\d+\.\d+)%', text, re.I)
         if exp_match:
             exp = float(exp_match.group(1))
             if 0 < exp <= 5:
                 result["expense_ratio"] = exp
 
         # Fund Manager
-        manager_match = re.search(r'Fund Manager.*?:?\s*([A-Za-z\s&.,-]+)', text, re.I)
+        manager_match = re.search(r'it is currently managed by ([A-Za-z\s&.,-]+)', text, re.I)
         if manager_match:
-            result["fund_manager"] = manager_match.group(1).strip()[:100]
+            result["fund_manager"] = manager_match.group(1).strip()[:120]
 
-        # Launch Date
-        launch_match = re.search(r'Launch Date.*?(\d{1,2}\s+[A-Za-z]+\s+\d{4})', text, re.I)
+        # Launch Date - exact pattern
+        launch_match = re.search(r'Launched on ([A-Za-z]+\s+\d{1,2},?\s+\d{4})', text, re.I)
         if launch_match:
             result["launch_date"] = launch_match.group(1)
 
@@ -81,7 +76,6 @@ def scrape_valueresearch(vr_url: str) -> dict:
 
     return result
 
-# MFAPI functions (unchanged)
 def fetch_mfapi_data(mfapi_id: int) -> dict:
     try:
         r = _get(MFAPI_DETAIL.format(mfapi_id))
