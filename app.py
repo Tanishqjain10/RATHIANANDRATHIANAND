@@ -212,6 +212,7 @@ latest_fetch = max(
 last_updated = latest_fetch.get("last_updated", "Not fetched yet")
 total_provided_urls = int(df.get("provided_url_count", pd.Series(dtype=int)).sum())
 total_fetched_urls = int(df.get("fetched_url_count", pd.Series(dtype=int)).sum())
+total_nav_feeds = int(df.get("mfapi_fetched", pd.Series(dtype=bool)).fillna(False).sum())
 
 # ─── Status bar ──────────────────────────────────────────────────────────────
 c1, c2 = st.columns([8, 2])
@@ -232,6 +233,7 @@ with st.expander("Live data source audit", expanded=False):
         "provided_url_count",
         "fetched_url_count",
         "failed_url_count",
+        "mfapi_fetched",
         "last_updated",
     ]
     audit_df = df[[c for c in audit_cols if c in df.columns]].rename(columns={
@@ -239,6 +241,7 @@ with st.expander("Live data source audit", expanded=False):
         "provided_url_count": "URLs Provided",
         "fetched_url_count": "URLs Fetched",
         "failed_url_count": "URLs Pending",
+        "mfapi_fetched": "NAV Feed",
         "last_updated": "Last Updated",
     })
     st.dataframe(audit_df, use_container_width=True, hide_index=True)
@@ -257,7 +260,7 @@ kpi_data = [
     ("Avg Expense", fmt_pct(valid_exp.mean(), 2) if not valid_exp.empty else "N/A", "average TER"),
     ("Avg 3Y CAGR", fmt_pct(valid_cagr3.mean(), 1) if not valid_cagr3.empty else "N/A", "3-year CAGR"),
     ("Avg Std Dev", fmt_pct(valid_std.mean(), 1) if not valid_std.empty else "N/A", "annualised volatility"),
-    ("Live URLs", f"{total_fetched_urls}/{total_provided_urls}", "configured URLs fetched"),
+    ("Live Sources", f"{total_fetched_urls}/{total_provided_urls}", f"NAV feeds {total_nav_feeds}/{len(df)}"),
 ]
 
 kpi_cols = st.columns(len(kpi_data))

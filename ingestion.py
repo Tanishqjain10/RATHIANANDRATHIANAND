@@ -48,6 +48,8 @@ def scrape_valueresearch(vr_url: str) -> Dict:
     result = {"source": "Value Research", "url": vr_url}
     try:
         r = _get(vr_url)
+        result["status_code"] = r.status_code
+        result["fetch_ok"] = 200 <= r.status_code < 400
         text = r.text
 
         # NAV
@@ -79,8 +81,10 @@ def scrape_valueresearch(vr_url: str) -> Dict:
         if launch_match:
             result["launch_date"] = launch_match.group(1)
 
-        logger.info(f"✅ VR Success: {vr_url}")
+        logger.info(f"VR fetch success: {vr_url}")
     except Exception as e:
+        result["fetch_ok"] = False
+        result["error"] = str(e)
         logger.warning(f"VR failed {vr_url}: {e}")
 
     return result
@@ -104,16 +108,18 @@ def scrape_all_valueresearch_urls(scheme: dict) -> Dict:
 
     for url in urls:
         data = scrape_valueresearch(url)
+        if data.get("fetch_ok"):
+            merged["fetched_urls"].append(url)
+        else:
+            merged["failed_urls"].append(url)
+
         has_live_fields = any(
             key in data for key in ("nav", "aum_raw", "expense_ratio", "fund_manager", "launch_date")
         )
         if has_live_fields:
-            merged["fetched_urls"].append(url)
             for key, value in data.items():
-                if value is not None and key not in ("source", "url"):
+                if value is not None and key not in ("source", "url", "fetch_ok", "status_code", "error"):
                     merged[key] = value
-        else:
-            merged["failed_urls"].append(url)
 
     merged["provided_url_count"] = len(urls)
     merged["fetched_url_count"] = len(merged["fetched_urls"])
@@ -204,6 +210,8 @@ def fetch_scheme_data(scheme: dict) -> dict:
     if mfapi_id:
         raw = fetch_mfapi_data(mfapi_id)
         nav_series = nav_series_from_mfapi(raw)
+        result["mfapi_id"] = mfapi_id
+        result["mfapi_fetched"] = not nav_series.empty
 
     result.update(compute_returns(nav_series))
     result.update(compute_risk_metrics(nav_series))

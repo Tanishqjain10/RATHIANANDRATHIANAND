@@ -66,6 +66,7 @@ DISPLAY_COLS = [
     "last_updated",
     "fetched_url_count",
     "provided_url_count",
+    "mfapi_fetched",
 ]
 
 RENAME = {
@@ -91,6 +92,7 @@ RENAME = {
     "last_updated":   "Last Updated",
     "fetched_url_count": "URLs Fetched",
     "provided_url_count": "URLs Provided",
+    "mfapi_fetched":  "NAV Feed",
 }
 
 
@@ -133,6 +135,8 @@ def build_summary_df(all_data: list) -> pd.DataFrame:
             "provided_url_count": d.get("provided_url_count", 0),
             "fetched_url_count":  d.get("fetched_url_count", 0),
             "failed_url_count":   d.get("failed_url_count", 0),
+            "mfapi_id":      d.get("mfapi_id"),
+            "mfapi_fetched": d.get("mfapi_fetched", False),
             "fetched_at":     d.get("fetched_at"),
         }
         rows.append(row)
