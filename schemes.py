@@ -1,7 +1,3 @@
-"""
-schemes.py – Master registry with Value Research URLs
-"""
-
 SCHEMES = [
     {"sr": 1, "name": "Quant Large Cap Fund", "short_name": "Quant Large Cap", "category": "Large Cap", "weight": 10, "mc_id": "MES082", "vr_url": "https://www.valueresearchonline.com/funds/42367/quant-large-cap-fund-direct-plan/", "vr_performance": "https://www.valueresearchonline.com/funds/42367/quant-large-cap-fund-direct-plan/#performance", "vr_risk": "https://www.valueresearchonline.com/funds/42367/quant-large-cap-fund-direct-plan/#risk", "vr_portfolio": "https://www.valueresearchonline.com/funds/42367/quant-large-cap-fund-direct-plan/#fund-portfolio", "vr_other": "https://www.valueresearchonline.com/funds/42367/quant-large-cap-fund-direct-plan/#other"},
     {"sr": 2, "name": "SBI Large & Midcap Fund", "short_name": "SBI Large & Midcap", "category": "Large & Mid Cap", "weight": 6, "mc_id": "MSB501", "vr_url": "https://www.valueresearchonline.com/funds/16240/sbi-large-midcap-fund-direct-plan/", "vr_performance": "https://www.valueresearchonline.com/funds/16240/sbi-large-midcap-fund-direct-plan/#performance", "vr_risk": "https://www.valueresearchonline.com/funds/16240/sbi-large-midcap-fund-direct-plan/#risk", "vr_portfolio": "https://www.valueresearchonline.com/funds/16240/sbi-large-midcap-fund-direct-plan/#fund-portfolio", "vr_other": "https://www.valueresearchonline.com/funds/16240/sbi-large-midcap-fund-direct-plan/#other"},
@@ -19,8 +15,4 @@ SCHEMES = [
     {"sr": 14, "name": "ICICI Pru Dividend Yield Equity Fund", "short_name": "ICICI Pru Div Yield", "category": "Dividend Yield", "weight": 7, "mc_id": "MPI2056", "vr_url": "https://www.valueresearchonline.com/funds/26271/icici-prudential-dividend-yield-equity-fund-direct-plan/", "vr_performance": "https://www.valueresearchonline.com/funds/26271/icici-prudential-dividend-yield-equity-fund-direct-plan/#performance", "vr_risk": "https://www.valueresearchonline.com/funds/26271/icici-prudential-dividend-yield-equity-fund-direct-plan/#risk", "vr_portfolio": "https://www.valueresearchonline.com/funds/26271/icici-prudential-dividend-yield-equity-fund-direct-plan/#fund-portfolio", "vr_other": "https://www.valueresearchonline.com/funds/26271/icici-prudential-dividend-yield-equity-fund-direct-plan/#other"},
 ]
 
-CATEGORY_COLORS = {
-    "Large Cap": "#1f77b4", "Large & Mid Cap": "#ff7f0e", "Mid Cap": "#2ca02c",
-    "Small Cap": "#d62728", "Flexi Cap": "#9467bd", "Multi Cap": "#8c564b",
-    "Multi Cap*": "#e377c2", "Focused": "#7f7f7f", "Dividend Yield": "#bcbd22",
-}
+CATEGORY_COLORS = {"Large Cap": "#1f77b4", "Large & Mid Cap": "#ff7f0e", "Mid Cap": "#2ca02c", "Small Cap": "#d62728", "Flexi Cap": "#9467bd", "Multi Cap": "#8c564b", "Multi Cap*": "#e377c2", "Focused": "#7f7f7f", "Dividend Yield": "#bcbd22"}
