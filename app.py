@@ -260,7 +260,7 @@ kpi_data = [
     ("Avg Expense", fmt_pct(valid_exp.mean(), 2) if not valid_exp.empty else "N/A", "average TER"),
     ("Avg 3Y CAGR", fmt_pct(valid_cagr3.mean(), 1) if not valid_cagr3.empty else "N/A", "3-year CAGR"),
     ("Avg Std Dev", fmt_pct(valid_std.mean(), 1) if not valid_std.empty else "N/A", "annualised volatility"),
-    ("Live Sources", f"{total_fetched_urls}/{total_provided_urls}", f"NAV feeds {total_nav_feeds}/{len(df)}"),
+    ("Live APIs", f"{total_nav_feeds}/{len(df)}", f"source pages {total_fetched_urls}/{total_provided_urls}"),
 ]
 
 kpi_cols = st.columns(len(kpi_data))
