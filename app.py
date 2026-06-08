@@ -261,30 +261,36 @@ with tabs[0]:
 
     disp = to_display_df(df_filtered).reset_index(drop=True)
 
-    # === PORTFOLIO AVERAGE ROW ===
-    avg_row = {
-        "Fund": "PORTFOLIO AVERAGE",
-        "Category": "",
-        "Wt %": "",
-        "NAV (₹)": round(df["nav"].mean(), 2) if not df["nav"].empty else None,
-        "AUM (Cr)": round(df["aum_cr"].mean(), 0) if not df["aum_cr"].empty else None,
-        "Exp Ratio": round(df["expense_ratio"].mean(), 2) if not df["expense_ratio"].empty else None,
-        "1M Ret": round(df["ret_1m"].mean(), 2) if not df["ret_1m"].empty else None,
-        "3M Ret": round(df["ret_3m"].mean(), 2) if not df["ret_3m"].empty else None,
-        "6M Ret": round(df["ret_6m"].mean(), 2) if not df["ret_6m"].empty else None,
-        "1Y Ret": round(df["ret_1y"].mean(), 2) if not df["ret_1y"].empty else None,
-        "3Y CAGR": round(df["cagr_3y"].mean(), 2) if not df["cagr_3y"].empty else None,
-        "5Y CAGR": round(df["cagr_5y"].mean(), 2) if not df["cagr_5y"].empty else None,
-        "Std Dev": round(df["std_dev"].mean(), 2) if not df["std_dev"].empty else None,
-    }
+  disp = to_display_df(df_filtered).reset_index(drop=True)
 
-    # === PORTFOLIO TOTAL ROW ===
-    total_row = {
-        "Fund": "PORTFOLIO TOTAL",
-        "Category": "",
-        "Wt %": "100%",
-        "AUM (Cr)": round(df["aum_cr"].sum(), 0) if not df["aum_cr"].empty else None,
-    }
+# Portfolio Average Row
+avg_row = {
+    "Fund": "PORTFOLIO AVERAGE",
+    "Category": "",
+    "Wt %": "",
+    "NAV (₹)": round(df["nav"].mean(), 2) if not df["nav"].empty else None,
+    "AUM (Cr)": round(df["aum_cr"].mean(), 0) if not df["aum_cr"].empty else None,
+    "Exp Ratio": round(df["expense_ratio"].mean(), 2) if not df["expense_ratio"].empty else None,
+    "1M Ret": round(df["ret_1m"].mean(), 2) if not df["ret_1m"].empty else None,
+    "3M Ret": round(df["ret_3m"].mean(), 2) if not df["ret_3m"].empty else None,
+    "6M Ret": round(df["ret_6m"].mean(), 2) if not df["ret_6m"].empty else None,
+    "1Y Ret": round(df["ret_1y"].mean(), 2) if not df["ret_1y"].empty else None,
+    "3Y CAGR": round(df["cagr_3y"].mean(), 2) if not df["cagr_3y"].empty else None,
+    "5Y CAGR": round(df["cagr_5y"].mean(), 2) if not df["cagr_5y"].empty else None,
+    "Std Dev": round(df["std_dev"].mean(), 2) if not df["std_dev"].empty else None,
+}
+
+# Portfolio Total Row
+total_row = {
+    "Fund": "PORTFOLIO TOTAL",
+    "Category": "",
+    "Wt %": "100%",
+    "AUM (Cr)": round(df["aum_cr"].sum(), 0) if not df["aum_cr"].empty else None,
+}
+
+disp = pd.concat([disp, pd.DataFrame([avg_row, total_row])], ignore_index=True)
+
+st.dataframe(disp, use_container_width=True, height=620, ...)
 
     disp = pd.concat([disp, pd.DataFrame([avg_row, total_row])], ignore_index=True)
 
