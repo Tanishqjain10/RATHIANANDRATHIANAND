@@ -3,7 +3,8 @@ app.py – Anand Rathi Equity MF Model Portfolio Dashboard
 =========================================================
 Run: streamlit run app.py
 """
-import sys, os
+import sys
+import os
 sys.path.insert(0, os.path.dirname(__file__))
 
 import time
@@ -101,6 +102,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
 # ─── Constants ───────────────────────────────────────────────────────────────
 REFRESH_INTERVAL = 300
+
 NIFTY_RETURNS = {
     "ret_1y": 22.5, "cagr_3y": 14.8, "cagr_5y": 15.2, "inception": 12.0
 }
@@ -120,9 +122,11 @@ def load_all_data():
     progress.empty()
     return all_data, all_holdings
 
+
 @st.cache_data(ttl=REFRESH_INTERVAL)
 def get_summary_df(all_data):
     return build_summary_df(all_data)
+
 
 # ─── Plotly theme helper ──────────────────────────────────────────────────────
 PLOTLY_LAYOUT = dict(
@@ -134,11 +138,13 @@ PLOTLY_LAYOUT = dict(
     margin=dict(l=10, r=10, t=40, b=10),
 )
 
+
 def apply_theme(fig):
     fig.update_layout(**PLOTLY_LAYOUT)
     fig.update_xaxes(gridcolor="#e2e8f0", linecolor="#cbd5e1")
     fig.update_yaxes(gridcolor="#e2e8f0", linecolor="#cbd5e1")
     return fig
+
 
 # ─── Sidebar ─────────────────────────────────────────────────────────────────
 with st.sidebar:
@@ -255,42 +261,36 @@ tabs = st.tabs([
     "📊 Charts",
 ])
 
-# ─── Tab 1: Comparison Table (WITH PORTFOLIO AVERAGE + TOTAL) ─────────────────
+# ─── Tab 1: Comparison Table ──────────────────────────────────────────────────
 with tabs[0]:
     st.markdown("<div class='section-header'>B · Scheme Comparison Table</div>", unsafe_allow_html=True)
 
     disp = to_display_df(df_filtered).reset_index(drop=True)
 
-  disp = to_display_df(df_filtered).reset_index(drop=True)
+    # Portfolio Average Row
+    avg_row = {
+        "Fund": "PORTFOLIO AVERAGE",
+        "Category": "",
+        "Wt %": "",
+        "NAV (₹)": round(df["nav"].mean(), 2) if not df["nav"].empty else None,
+        "AUM (Cr)": round(df["aum_cr"].mean(), 0) if not df["aum_cr"].empty else None,
+        "Exp Ratio": round(df["expense_ratio"].mean(), 2) if not df["expense_ratio"].empty else None,
+        "1M Ret": round(df["ret_1m"].mean(), 2) if not df["ret_1m"].empty else None,
+        "3M Ret": round(df["ret_3m"].mean(), 2) if not df["ret_3m"].empty else None,
+        "6M Ret": round(df["ret_6m"].mean(), 2) if not df["ret_6m"].empty else None,
+        "1Y Ret": round(df["ret_1y"].mean(), 2) if not df["ret_1y"].empty else None,
+        "3Y CAGR": round(df["cagr_3y"].mean(), 2) if not df["cagr_3y"].empty else None,
+        "5Y CAGR": round(df["cagr_5y"].mean(), 2) if not df["cagr_5y"].empty else None,
+        "Std Dev": round(df["std_dev"].mean(), 2) if not df["std_dev"].empty else None,
+    }
 
-# Portfolio Average Row
-avg_row = {
-    "Fund": "PORTFOLIO AVERAGE",
-    "Category": "",
-    "Wt %": "",
-    "NAV (₹)": round(df["nav"].mean(), 2) if not df["nav"].empty else None,
-    "AUM (Cr)": round(df["aum_cr"].mean(), 0) if not df["aum_cr"].empty else None,
-    "Exp Ratio": round(df["expense_ratio"].mean(), 2) if not df["expense_ratio"].empty else None,
-    "1M Ret": round(df["ret_1m"].mean(), 2) if not df["ret_1m"].empty else None,
-    "3M Ret": round(df["ret_3m"].mean(), 2) if not df["ret_3m"].empty else None,
-    "6M Ret": round(df["ret_6m"].mean(), 2) if not df["ret_6m"].empty else None,
-    "1Y Ret": round(df["ret_1y"].mean(), 2) if not df["ret_1y"].empty else None,
-    "3Y CAGR": round(df["cagr_3y"].mean(), 2) if not df["cagr_3y"].empty else None,
-    "5Y CAGR": round(df["cagr_5y"].mean(), 2) if not df["cagr_5y"].empty else None,
-    "Std Dev": round(df["std_dev"].mean(), 2) if not df["std_dev"].empty else None,
-}
-
-# Portfolio Total Row
-total_row = {
-    "Fund": "PORTFOLIO TOTAL",
-    "Category": "",
-    "Wt %": "100%",
-    "AUM (Cr)": round(df["aum_cr"].sum(), 0) if not df["aum_cr"].empty else None,
-}
-
-disp = pd.concat([disp, pd.DataFrame([avg_row, total_row])], ignore_index=True)
-
-st.dataframe(disp, use_container_width=True, height=620, ...)
+    # Portfolio Total Row
+    total_row = {
+        "Fund": "PORTFOLIO TOTAL",
+        "Category": "",
+        "Wt %": "100%",
+        "AUM (Cr)": round(df["aum_cr"].sum(), 0) if not df["aum_cr"].empty else None,
+    }
 
     disp = pd.concat([disp, pd.DataFrame([avg_row, total_row])], ignore_index=True)
 
@@ -312,9 +312,37 @@ st.dataframe(disp, use_container_width=True, height=620, ...)
     </p>
     """, unsafe_allow_html=True)
 
-# ─── Remaining tabs (2-8) remain exactly as in your original code ─────────────
-# (You can paste your existing code for Portfolio Analysis, Fund Flows, etc. here)
+# ─── Tab 2: Portfolio Analysis ────────────────────────────────────────────────
+with tabs[1]:
+    st.markdown("<div class='section-header'>C · Portfolio Analysis</div>", unsafe_allow_html=True)
+    st.info("Portfolio Analysis tab content goes here (your original code can be placed in this block).")
 
+# ─── Tab 3 to 8 ───────────────────────────────────────────────────────────────
+with tabs[2]:
+    st.markdown("<div class='section-header'>Fund Flows</div>", unsafe_allow_html=True)
+    st.info("Fund Flows content goes here.")
+
+with tabs[3]:
+    st.markdown("<div class='section-header'>Stock Movements</div>", unsafe_allow_html=True)
+    st.info("Stock Movements content goes here.")
+
+with tabs[4]:
+    st.markdown("<div class='section-header'>Overlap Matrix</div>", unsafe_allow_html=True)
+    st.info("Overlap Matrix content goes here.")
+
+with tabs[5]:
+    st.markdown("<div class='section-header'>Benchmark</div>", unsafe_allow_html=True)
+    st.info("Benchmark content goes here.")
+
+with tabs[6]:
+    st.markdown("<div class='section-header'>Risk Analysis</div>", unsafe_allow_html=True)
+    st.info("Risk Analysis content goes here.")
+
+with tabs[7]:
+    st.markdown("<div class='section-header'>Charts</div>", unsafe_allow_html=True)
+    st.info("Charts content goes here.")
+
+# ─── Footer ───────────────────────────────────────────────────────────────────
 st.markdown("""
 <p class="source-note" style="text-align:center; margin-top:20px;">
 Auto-refresh every 60 seconds • Primary source: Value Research
