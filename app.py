@@ -144,6 +144,52 @@ def apply_theme(fig):
     return fig
 
 
+def num_col(frame, column):
+    if column not in frame.columns:
+        return pd.Series(dtype=float)
+    return pd.to_numeric(frame[column], errors="coerce").replace([np.inf, -np.inf], np.nan)
+
+
+def safe_mean(frame, column):
+    values = num_col(frame, column).dropna()
+    return None if values.empty else values.mean()
+
+
+def safe_sum(frame, column):
+    values = num_col(frame, column).dropna()
+    return None if values.empty else values.sum()
+
+
+def weighted_mean(frame, column, weight_column="weight"):
+    values = num_col(frame, column)
+    weights = num_col(frame, weight_column)
+    valid = values.notna() & weights.notna() & (weights > 0)
+    if not valid.any():
+        return safe_mean(frame, column)
+    return np.average(values[valid], weights=weights[valid])
+
+
+def fmt_signed_pct(val, decimals=2):
+    if val is None or pd.isna(val):
+        return "N/A"
+    return f"{val:+.{decimals}f}%"
+
+
+def render_metric_grid(items, columns=3):
+    for start in range(0, len(items), columns):
+        cols = st.columns(columns)
+        for col, item in zip(cols, items[start:start + columns]):
+            label, value, sub = item
+            col.markdown(f"""
+            <div class="kpi-card">
+                <div class="kpi-label">{label}</div>
+                <div class="kpi-value">{value}</div>
+                <div class="kpi-sub">{sub}</div>
+            </div>
+            """, unsafe_allow_html=True)
+        st.markdown("<br>", unsafe_allow_html=True)
+
+
 # ─── Sidebar ─────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("## ⚙️ Controls")
@@ -164,9 +210,9 @@ with st.sidebar:
     st.markdown("""
     <div style="font-size:0.75rem; opacity:0.7; line-height:1.6;">
     <b>Data Sources</b><br>
-    • Primary: <b>Value Research</b><br>
-    • NAV History: mfapi.in<br>
-    • Benchmark: NSE Nifty 50 TRI
+    • Live NAV/returns: <b>mfapi.in</b><br>
+    • Scheme pages: Value Research (best effort)<br>
+    • Benchmark: Not configured
     </div>
     """, unsafe_allow_html=True)
 
@@ -227,25 +273,30 @@ with c2:
                 unsafe_allow_html=True)
 
 # ─── Section A: KPI Summary ───────────────────────────────────────────────────
-with st.expander("Live data source audit", expanded=False):
-    audit_cols = [
+with st.expander("Live API health", expanded=True):
+    api_health = df[[
         "short_name",
-        "provided_url_count",
-        "fetched_url_count",
-        "failed_url_count",
+        "mfapi_id",
         "mfapi_fetched",
+        "nav",
+        "nav_date",
+        "ret_1y",
+        "cagr_3y",
         "last_updated",
-    ]
-    audit_df = df[[c for c in audit_cols if c in df.columns]].rename(columns={
+    ]].copy()
+    api_health["Status"] = np.where(api_health["mfapi_fetched"], "OK", "Check")
+    api_health = api_health.rename(columns={
         "short_name": "Fund",
-        "provided_url_count": "URLs Provided",
-        "fetched_url_count": "URLs Fetched",
-        "failed_url_count": "URLs Pending",
-        "mfapi_fetched": "NAV Feed",
+        "mfapi_id": "API ID",
+        "nav": "NAV",
+        "nav_date": "NAV Date",
+        "ret_1y": "1Y Return",
+        "cagr_3y": "3Y CAGR",
         "last_updated": "Last Updated",
     })
-    st.dataframe(audit_df, use_container_width=True, hide_index=True)
-    st.caption("NAV and return data refresh every 5 minutes through mfapi.in. Website source pages are audited separately because hosts may block server-side scraping.")
+    api_health = api_health[["Fund", "API ID", "Status", "NAV", "NAV Date", "1Y Return", "3Y CAGR", "Last Updated"]]
+    st.dataframe(api_health, use_container_width=True, hide_index=True)
+    st.caption("Priority live feed: mfapi.in. If every row shows OK and NAV/NAV Date are filled, the live API is working.")
 
 st.markdown("<div class='section-header'>A · Portfolio Summary</div>", unsafe_allow_html=True)
 
@@ -333,44 +384,163 @@ with tabs[0]:
 
     st.markdown("""
     <p class="source-note">
-    ℹ️ All values sourced from <b>Value Research</b> (primary) + <b>mfapi.in</b> (returns).<br>
+    ℹ️ NAV, return, CAGR, and volatility values are sourced from the live <b>mfapi.in</b> feed.<br>
     Last two rows = <b>Portfolio Average</b> and <b>Portfolio Total</b> (calculated dynamically).
     </p>
     """, unsafe_allow_html=True)
 
 # ─── Tab 2: Portfolio Analysis ────────────────────────────────────────────────
 with tabs[1]:
-    st.markdown("<div class='section-header'>C · Portfolio Analysis</div>", unsafe_allow_html=True)
-    st.info("Portfolio Analysis tab content goes here (your original code can be placed in this block).")
+    st.markdown("<div class='section-header'>C · Aggregated Portfolio View</div>", unsafe_allow_html=True)
+
+    avg_aum = safe_mean(df_filtered, "aum_cr")
+    avg_expense = safe_mean(df_filtered, "expense_ratio")
+    avg_std = safe_mean(df_filtered, "std_dev")
+    metric_items = [
+        ("Avg AUM", fmt_cr(avg_aum), "available source-page data"),
+        ("Avg Exp Ratio", fmt_pct(avg_expense, 2), "available source-page data"),
+        ("Avg 3M Return", fmt_signed_pct(weighted_mean(df_filtered, "ret_3m")), "weighted by model allocation"),
+        ("Avg 1Y Return", fmt_signed_pct(weighted_mean(df_filtered, "ret_1y")), "weighted by model allocation"),
+        ("Avg 3Y CAGR", fmt_signed_pct(weighted_mean(df_filtered, "cagr_3y")), "weighted by model allocation"),
+        ("Avg 5Y CAGR", fmt_signed_pct(weighted_mean(df_filtered, "cagr_5y")), "weighted by model allocation"),
+        ("Avg Std Dev", fmt_pct(avg_std, 2), "annualised volatility"),
+        ("Live APIs", f"{total_nav_feeds}/{len(df)}", "mfapi NAV/returns feed"),
+        ("Last Updated", last_updated, "auto-refresh every 5 minutes"),
+    ]
+    render_metric_grid(metric_items, columns=3)
+
+    left, right = st.columns([1, 1])
+    with left:
+        st.markdown("<div class='section-header'>Category Allocation</div>", unsafe_allow_html=True)
+        category_df = (
+            df_filtered.groupby("category", as_index=False)["weight"]
+            .sum()
+            .sort_values("weight", ascending=False)
+        )
+        if category_df.empty:
+            st.warning("No category allocation available for the selected filters.")
+        else:
+            fig = px.pie(
+                category_df,
+                names="category",
+                values="weight",
+                hole=0.45,
+                color="category",
+                color_discrete_map=CATEGORY_COLORS,
+            )
+            fig.update_traces(textposition="inside", textinfo="percent+label")
+            st.plotly_chart(apply_theme(fig), use_container_width=True)
+
+    with right:
+        st.markdown("<div class='section-header'>Return Profile</div>", unsafe_allow_html=True)
+        return_cols = ["ret_1m", "ret_3m", "ret_6m", "ret_1y", "cagr_3y", "cagr_5y"]
+        return_rows = []
+        for col in return_cols:
+            val = weighted_mean(df_filtered, col)
+            if val is not None and not pd.isna(val):
+                return_rows.append({"Metric": col.replace("ret_", "").replace("cagr_", "").upper(), "Return": val})
+        if return_rows:
+            ret_fig = px.bar(pd.DataFrame(return_rows), x="Metric", y="Return", text="Return")
+            ret_fig.update_traces(texttemplate="%{text:.2f}%", textposition="outside")
+            st.plotly_chart(apply_theme(ret_fig), use_container_width=True)
+        else:
+            st.warning("Return profile is not available for the selected filters.")
+
+    st.markdown("<div class='section-header'>Risk vs Return</div>", unsafe_allow_html=True)
+    risk_df = df_filtered.copy()
+    risk_df["cagr_3y_num"] = num_col(risk_df, "cagr_3y")
+    risk_df["std_dev_num"] = num_col(risk_df, "std_dev")
+    risk_df = risk_df.dropna(subset=["cagr_3y_num", "std_dev_num"])
+    if risk_df.empty:
+        st.warning("Risk-return chart needs CAGR and volatility data.")
+    else:
+        risk_fig = px.scatter(
+            risk_df,
+            x="std_dev_num",
+            y="cagr_3y_num",
+            size="weight",
+            color="category",
+            hover_name="short_name",
+            color_discrete_map=CATEGORY_COLORS,
+            labels={"std_dev_num": "Std Dev (%)", "cagr_3y_num": "3Y CAGR (%)"},
+        )
+        st.plotly_chart(apply_theme(risk_fig), use_container_width=True)
 
 # ─── Tab 3 to 8 ───────────────────────────────────────────────────────────────
 with tabs[2]:
     st.markdown("<div class='section-header'>Fund Flows</div>", unsafe_allow_html=True)
-    st.info("Fund Flows content goes here.")
+    st.info("Live fund-flow feed is not configured yet. NAV, returns, CAGR, volatility, and allocation views remain live.")
 
 with tabs[3]:
     st.markdown("<div class='section-header'>Stock Movements</div>", unsafe_allow_html=True)
-    st.info("Stock Movements content goes here.")
+    st.info("Live stock movement data needs a holdings disclosure feed per scheme. No manual or fake movements are shown.")
 
 with tabs[4]:
     st.markdown("<div class='section-header'>Overlap Matrix</div>", unsafe_allow_html=True)
-    st.info("Overlap Matrix content goes here.")
+    scheme_ids = [d.get("mc_id") for d in filtered_data if d.get("mc_id")]
+    has_holdings = any(all_holdings.get(sid, {}).get("top_holdings") for sid in scheme_ids)
+    if has_holdings:
+        overlap = compute_overlap_matrix(all_holdings, scheme_ids)
+        st.dataframe(overlap, use_container_width=True)
+    else:
+        st.info("Holdings feed is not configured yet, so stock overlap is not calculated. Category allocation and risk-return views are still live.")
 
 with tabs[5]:
     st.markdown("<div class='section-header'>Benchmark</div>", unsafe_allow_html=True)
-    st.info("Benchmark content goes here.")
+    st.info("Benchmark API is not configured yet. This tab will remain empty instead of showing static/manual benchmark numbers.")
 
 with tabs[6]:
     st.markdown("<div class='section-header'>Risk Analysis</div>", unsafe_allow_html=True)
-    st.info("Risk Analysis content goes here.")
+    risk_table = df_filtered[["short_name", "category", "weight", "cagr_3y", "cagr_5y", "std_dev"]].copy()
+    risk_table = risk_table.rename(columns={
+        "short_name": "Fund",
+        "category": "Category",
+        "weight": "Wt %",
+        "cagr_3y": "3Y CAGR",
+        "cagr_5y": "5Y CAGR",
+        "std_dev": "Std Dev",
+    })
+    st.dataframe(risk_table, use_container_width=True, hide_index=True)
 
 with tabs[7]:
     st.markdown("<div class='section-header'>Charts</div>", unsafe_allow_html=True)
-    st.info("Charts content goes here.")
+    chart_df = df_filtered.copy()
+    chart_df["ret_1y_num"] = num_col(chart_df, "ret_1y")
+    chart_df["cagr_3y_num"] = num_col(chart_df, "cagr_3y")
+    chart_df["cagr_5y_num"] = num_col(chart_df, "cagr_5y")
+
+    top_chart, category_chart = st.columns([1, 1])
+    with top_chart:
+        perf_df = chart_df.dropna(subset=["cagr_3y_num"]).sort_values("cagr_3y_num", ascending=False)
+        if perf_df.empty:
+            st.warning("Performance chart needs 3Y CAGR data.")
+        else:
+            fig = px.bar(
+                perf_df,
+                x="cagr_3y_num",
+                y="short_name",
+                color="category",
+                orientation="h",
+                labels={"cagr_3y_num": "3Y CAGR (%)", "short_name": "Fund"},
+                color_discrete_map=CATEGORY_COLORS,
+            )
+            st.plotly_chart(apply_theme(fig), use_container_width=True)
+
+    with category_chart:
+        category_df = (
+            chart_df.groupby("category", as_index=False)["weight"]
+            .sum()
+            .sort_values("weight", ascending=False)
+        )
+        if category_df.empty:
+            st.warning("Category chart needs allocation data.")
+        else:
+            fig = px.treemap(category_df, path=["category"], values="weight", color="category", color_discrete_map=CATEGORY_COLORS)
+            st.plotly_chart(apply_theme(fig), use_container_width=True)
 
 # ─── Footer ───────────────────────────────────────────────────────────────────
 st.markdown("""
 <p class="source-note" style="text-align:center; margin-top:20px;">
-Auto-refresh every 5 minutes • Primary source: Value Research + mfapi.in
+Auto-refresh every 5 minutes • Live API source: mfapi.in
 </p>
 """, unsafe_allow_html=True)
