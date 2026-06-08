@@ -245,7 +245,7 @@ with st.expander("Live data source audit", expanded=False):
         "last_updated": "Last Updated",
     })
     st.dataframe(audit_df, use_container_width=True, hide_index=True)
-    st.caption("The dashboard refreshes cached live data every 5 minutes and uses the URLs configured in schemes.py.")
+    st.caption("NAV and return data refresh every 5 minutes through mfapi.in. Website source pages are audited separately because hosts may block server-side scraping.")
 
 st.markdown("<div class='section-header'>A · Portfolio Summary</div>", unsafe_allow_html=True)
 
@@ -260,7 +260,7 @@ kpi_data = [
     ("Avg Expense", fmt_pct(valid_exp.mean(), 2) if not valid_exp.empty else "N/A", "average TER"),
     ("Avg 3Y CAGR", fmt_pct(valid_cagr3.mean(), 1) if not valid_cagr3.empty else "N/A", "3-year CAGR"),
     ("Avg Std Dev", fmt_pct(valid_std.mean(), 1) if not valid_std.empty else "N/A", "annualised volatility"),
-    ("Live APIs", f"{total_nav_feeds}/{len(df)}", f"source pages {total_fetched_urls}/{total_provided_urls}"),
+    ("Live APIs", f"{total_nav_feeds}/{len(df)}", "NAV/returns via mfapi.in"),
 ]
 
 kpi_cols = st.columns(len(kpi_data))
