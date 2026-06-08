@@ -1,5 +1,5 @@
 """
-ingestion.py - FINAL LIVE VERSION
+ingestion.py - FINAL ROBUST VERSION
 """
 
 import re
@@ -15,7 +15,9 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+}
 
 SESSION = requests.Session()
 SESSION.headers.update(HEADERS)
@@ -29,7 +31,7 @@ MC_TO_MFAPI = {
     "MLI1122": 120840, "MPI2056": 120600,
 }
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=6))
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8))
 def _get(url: str, timeout: int = 20):
     return SESSION.get(url, timeout=timeout)
 
@@ -37,6 +39,7 @@ def scrape_valueresearch(vr_url: str) -> dict:
     result = {"source": "Value Research", "url": vr_url}
     try:
         r = _get(vr_url)
+        soup = BeautifulSoup(r.text, "lxml")
         text = r.text
 
         # NAV
@@ -46,12 +49,16 @@ def scrape_valueresearch(vr_url: str) -> dict:
             if nav > 0:
                 result["nav"] = nav
 
-        # AUM
+        # AUM - Multiple patterns
         aum_match = re.search(r'AUM.*?₹?([\d,]+\.?\d*)\s*Cr', text, re.I)
         if aum_match:
             result["aum_raw"] = f"₹{aum_match.group(1)} Cr"
+        else:
+            aum_match2 = re.search(r'₹?([\d,]+\.?\d*)\s*Cr', text, re.I)
+            if aum_match2:
+                result["aum_raw"] = f"₹{aum_match2.group(1)} Cr"
 
-        # Expense Ratio
+        # Expense Ratio - Multiple patterns
         exp_match = re.search(r'Expense Ratio.*?(\d+\.\d+)%', text, re.I)
         if exp_match:
             exp = float(exp_match.group(1))
@@ -68,12 +75,13 @@ def scrape_valueresearch(vr_url: str) -> dict:
         if launch_match:
             result["launch_date"] = launch_match.group(1)
 
-        logger.info(f"✅ VR Success: {vr_url}")
+        logger.info(f"✅ VR scrape success: {vr_url}")
     except Exception as e:
-        logger.warning(f"VR failed {vr_url}: {e}")
+        logger.warning(f"VR scrape failed {vr_url}: {e}")
 
     return result
 
+# MFAPI functions (unchanged)
 def fetch_mfapi_data(mfapi_id: int) -> dict:
     try:
         r = _get(MFAPI_DETAIL.format(mfapi_id))
