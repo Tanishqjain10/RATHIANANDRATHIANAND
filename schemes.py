@@ -1,0 +1,152 @@
+"""
+schemes.py – Master registry of all 14 schemes in the model portfolio.
+Each entry carries the MoneyControl URL, portfolio weight, and category
+assigned by Anand Rathi's model portfolio (Oct'25-Dec'26).
+"""
+
+SCHEMES = [
+    {
+        "sr": 1,
+        "name": "Quant Large Cap Fund-Reg(G)",
+        "short_name": "Quant Large Cap",
+        "category": "Large Cap",
+        "weight": 10,
+        "mc_url": "https://www.moneycontrol.com/mutual-funds/nav/quant-large-cap-fund-regular-plan/MES082",
+        "mc_id": "MES082",
+    },
+    {
+        "sr": 2,
+        "name": "SBI Large & Midcap Fund-Reg(G)",
+        "short_name": "SBI Large & Midcap",
+        "category": "Large & Mid Cap",
+        "weight": 6,
+        "mc_url": "https://www.moneycontrol.com/mutual-funds/nav/sbi-large-midcap-fund-direct-plan/MSB501",
+        "mc_id": "MSB501",
+    },
+    {
+        "sr": 3,
+        "name": "DSP Large & Mid Cap Fund-Reg(G)",
+        "short_name": "DSP Large & Mid Cap",
+        "category": "Large & Mid Cap",
+        "weight": 9,
+        "mc_url": "https://www.moneycontrol.com/mutual-funds/nav/dsp-large-mid-cap-fund-direct-plan/MDS580",
+        "mc_id": "MDS580",
+    },
+    {
+        "sr": 4,
+        "name": "Bandhan Large & Mid Cap Fund-Reg(G)",
+        "short_name": "Bandhan L&M Cap",
+        "category": "Large & Mid Cap",
+        "weight": 7,
+        "mc_url": "https://www.moneycontrol.com/mutual-funds/nav/bandhan-large-mid-cap-fund-regular-plan-growth/MAG091",
+        "mc_id": "MAG091",
+    },
+    {
+        "sr": 5,
+        "name": "Kotak Midcap Fund-Reg(G)",
+        "short_name": "Kotak Midcap",
+        "category": "Mid Cap",
+        "weight": 6,
+        "mc_url": "https://www.moneycontrol.com/mutual-funds/nav/kotak-midcap-fund-regular-plan/MKM099",
+        "mc_id": "MKM099",
+    },
+    {
+        "sr": 6,
+        "name": "Invesco India Smallcap Fund-Reg(G)",
+        "short_name": "Invesco Smallcap",
+        "category": "Small Cap",
+        "weight": 7,
+        "mc_url": "https://share.google/nVN3hkXVxBqh31Xly",
+        "mc_id": "INVESCO_SC",
+    },
+    {
+        "sr": 7,
+        "name": "HDFC Small Cap Fund-Reg(G)",
+        "short_name": "HDFC Small Cap",
+        "category": "Small Cap",
+        "weight": 5,
+        "mc_url": "https://www.moneycontrol.com/mutual-funds/nav/hdfc-small-cap-fund-direct-plan/MMS025",
+        "mc_id": "MMS025",
+    },
+    {
+        "sr": 8,
+        "name": "HDFC Flexi Cap Fund(G)",
+        "short_name": "HDFC Flexi Cap",
+        "category": "Flexi Cap",
+        "weight": 9,
+        "mc_url": "https://www.moneycontrol.com/mutual-funds/nav/hdfc-flexi-cap-fund-direct-plan-/MHD1144",
+        "mc_id": "MHD1144",
+    },
+    {
+        "sr": 9,
+        "name": "Kotak Multicap Fund-Reg(G)",
+        "short_name": "Kotak Multicap",
+        "category": "Multi Cap",
+        "weight": 7,
+        "mc_url": "https://www.moneycontrol.com/mutual-funds/nav/kotak-multicap-fund-regular-plan/MKM1397",
+        "mc_id": "MKM1397",
+    },
+    {
+        "sr": 10,
+        "name": "Canara Rob Multi Cap Fund-Reg(G)",
+        "short_name": "Canara Rob Multicap",
+        "category": "Multi Cap",
+        "weight": 7,
+        "mc_url": "https://www.moneycontrol.com/mutual-funds/nav/canara-robeco-multi-cap-fund-direct-plan-growth/MCAA002",
+        "mc_id": "MCAA002",
+    },
+    {
+        "sr": 11,
+        "name": "SBI Infrastructure Fund-Reg(G)",
+        "short_name": "SBI Infrastructure",
+        "category": "Multi Cap*",
+        "weight": 6,
+        "mc_url": "https://www.moneycontrol.com/mutual-funds/nav/sbi-infrastructure-fund-direct-plan/MSB520",
+        "mc_id": "MSB520",
+    },
+    {
+        "sr": 12,
+        "name": "ICICI Pru Focused Equity Fund(G)",
+        "short_name": "ICICI Pru Focused",
+        "category": "Focused",
+        "weight": 7,
+        "mc_url": "https://www.moneycontrol.com/mutual-funds/nav/icici-prudential-focused-equity-fund-retail-plan/MPI643",
+        "mc_id": "MPI643",
+    },
+    {
+        "sr": 13,
+        "name": "Invesco India Focused Fund-Reg(G)",
+        "short_name": "Invesco Focused",
+        "category": "Focused",
+        "weight": 7,
+        "mc_url": "https://www.moneycontrol.com/mutual-funds/nav/invesco-india-focused-fund-direct-plan-growth/MLI1122",
+        "mc_id": "MLI1122",
+    },
+    {
+        "sr": 14,
+        "name": "ICICI Pru Dividend Yield Equity Fund(G)",
+        "short_name": "ICICI Pru Div Yield",
+        "category": "Dividend Yield",
+        "weight": 7,
+        "mc_url": "https://www.moneycontrol.com/mutual-funds/nav/icici-prudential-dividend-yield-equity-fund-regular-plan/MPI2056",
+        "mc_id": "MPI2056",
+    },
+]
+
+# Nifty 50 benchmark
+BENCHMARK = {
+    "name": "Nifty 50 TRI",
+    "symbol": "^NSEI",
+}
+
+CATEGORY_COLORS = {
+    "Large Cap": "#1f77b4",
+    "Large & Mid Cap": "#ff7f0e",
+    "Mid Cap": "#2ca02c",
+    "Small Cap": "#d62728",
+    "Flexi Cap": "#9467bd",
+    "Multi Cap": "#8c564b",
+    "Multi Cap*": "#e377c2",
+    "Focused": "#7f7f7f",
+    "Dividend Yield": "#bcbd22",
+}
