@@ -1,11 +1,12 @@
 """
-ingestion.py - FINAL ROBUST VERSION (Value Research Primary)
+ingestion.py - PRODUCTION LIVE VERSION
+Value Research Primary + MFAPI Fallback
 """
 
 import re
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict
 
 import requests
 from bs4 import BeautifulSoup
@@ -15,9 +16,7 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-}
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
 SESSION = requests.Session()
 SESSION.headers.update(HEADERS)
@@ -35,25 +34,25 @@ MC_TO_MFAPI = {
 def _get(url: str, timeout: int = 20):
     return SESSION.get(url, timeout=timeout)
 
-def scrape_valueresearch(vr_url: str) -> dict:
+def scrape_valueresearch(vr_url: str) -> Dict:
     result = {"source": "Value Research", "url": vr_url}
     try:
         r = _get(vr_url)
         text = r.text
 
-        # NAV - exact pattern from VR
+        # NAV
         nav_match = re.search(r'The latest declared NAV of .*? is ₹?([\d,]+\.\d{2})', text, re.I)
         if nav_match:
             nav = float(nav_match.group(1).replace(",", ""))
             if nav > 0:
                 result["nav"] = nav
 
-        # AUM - exact pattern
+        # AUM
         aum_match = re.search(r'The fund has an overall AUM.*?₹?([\d,]+\.?\d*)\s*Cr', text, re.I)
         if aum_match:
             result["aum_raw"] = f"₹{aum_match.group(1)} Cr"
 
-        # Expense Ratio - exact pattern
+        # Expense Ratio
         exp_match = re.search(r'The fund has an expense ratio of (\d+\.\d+)%', text, re.I)
         if exp_match:
             exp = float(exp_match.group(1))
@@ -65,14 +64,14 @@ def scrape_valueresearch(vr_url: str) -> dict:
         if manager_match:
             result["fund_manager"] = manager_match.group(1).strip()[:120]
 
-        # Launch Date - exact pattern
+        # Launch Date
         launch_match = re.search(r'Launched on ([A-Za-z]+\s+\d{1,2},?\s+\d{4})', text, re.I)
         if launch_match:
             result["launch_date"] = launch_match.group(1)
 
-        logger.info(f"✅ VR scrape success: {vr_url}")
+        logger.info(f"✅ VR Success: {vr_url}")
     except Exception as e:
-        logger.warning(f"VR scrape failed {vr_url}: {e}")
+        logger.warning(f"VR failed {vr_url}: {e}")
 
     return result
 
