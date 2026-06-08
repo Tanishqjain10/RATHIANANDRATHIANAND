@@ -21,16 +21,14 @@ from plotly.subplots import make_subplots
 
 from schemes import SCHEMES, CATEGORY_COLORS
 
-# Import from root (flat structure for Streamlit Cloud)
+# Robust import for Streamlit Cloud
 try:
     from ingestion import fetch_scheme_data, get_holdings
-    from cleaning import (
-        build_summary_df, 
-        to_display_df,
-        compute_overlap_matrix, 
-        fmt_pct, 
-        fmt_cr
-    )
+    from cleaning import build_summary_df, to_display_df, compute_overlap_matrix, fmt_pct, fmt_cr
+    print("✅ Imported successfully from root")
+except ImportError as e:
+    st.error(f"Import error: {e}")
+    st.stop()
     print("✅ Imported from root (ingestion.py & cleaning.py)")
 except ImportError:
     # Fallback if modules folder exists
