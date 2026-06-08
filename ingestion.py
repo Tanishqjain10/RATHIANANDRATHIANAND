@@ -1,25 +1,27 @@
 """
-ingestion.py - FINAL PRODUCTION VERSION
-Value Research via Playwright (JS-rendered pages)
+ingestion.py - PRODUCTION VERSION (requests + BeautifulSoup)
+Value Research Primary Source
 """
 
 import re
 import logging
-import asyncio
 from datetime import datetime, timedelta
 from typing import Optional, Dict
 
+import requests
+from bs4 import BeautifulSoup
 import pandas as pd
 import numpy as np
 from tenacity import retry, stop_after_attempt, wait_exponential
 
-try:
-    from playwright.async_api import async_playwright
-    PLAYWRIGHT_AVAILABLE = True
-except ImportError:
-    PLAYWRIGHT_AVAILABLE = False
-
 logger = logging.getLogger(__name__)
+
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+}
+
+SESSION = requests.Session()
+SESSION.headers.update(HEADERS)
 
 MFAPI_DETAIL = "https://api.mfapi.in/mf/{}"
 
@@ -30,75 +32,54 @@ MC_TO_MFAPI = {
     "MLI1122": 120840, "MPI2056": 120600,
 }
 
-# ====================== PLAYWRIGHT SCRAPER ======================
+@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8))
+def _get(url: str, timeout: int = 20):
+    return SESSION.get(url, timeout=timeout)
 
-async def scrape_valueresearch_playwright(vr_url: str) -> Dict:
-    result = {"source": "Value Research (Playwright)", "url": vr_url}
-    if not PLAYWRIGHT_AVAILABLE:
-        result["error"] = "Playwright not available"
-        return result
-
+def scrape_valueresearch(vr_url: str) -> Dict:
+    result = {"source": "Value Research", "url": vr_url}
     try:
-        async with async_playwright() as p:
-            browser = await p.chromium.launch(headless=True)
-            page = await browser.new_page()
-            await page.goto(vr_url, timeout=45000)
-            await page.wait_for_load_state("networkidle", timeout=30000)
+        r = _get(vr_url)
+        text = r.text
 
-            content = await page.content()
+        # NAV
+        nav_match = re.search(r'The latest declared NAV of .*? is ₹?([\d,]+\.\d{2})', text, re.I)
+        if nav_match:
+            nav = float(nav_match.group(1).replace(",", ""))
+            if nav > 0:
+                result["nav"] = nav
 
-            # NAV
-            nav_match = re.search(r'The latest declared NAV of .*? is ₹?([\d,]+\.\d{2})', content, re.I)
-            if nav_match:
-                nav = float(nav_match.group(1).replace(",", ""))
-                if nav > 0:
-                    result["nav"] = nav
+        # AUM
+        aum_match = re.search(r'The fund has an overall AUM \(Assets Under Management\) of ₹?([\d,]+\.?\d*)\s*Cr', text, re.I)
+        if aum_match:
+            result["aum_raw"] = f"₹{aum_match.group(1)} Cr"
 
-            # AUM
-            aum_match = re.search(r'The fund has an overall AUM \(Assets Under Management\) of ₹?([\d,]+\.?\d*)\s*Cr', content, re.I)
-            if aum_match:
-                result["aum_raw"] = f"₹{aum_match.group(1)} Cr"
+        # Expense Ratio
+        exp_match = re.search(r'The fund has an expense ratio of (\d+\.\d+)%', text, re.I)
+        if exp_match:
+            exp = float(exp_match.group(1))
+            if 0 < exp <= 5:
+                result["expense_ratio"] = exp
 
-            # Expense Ratio
-            exp_match = re.search(r'The fund has an expense ratio of (\d+\.\d+)%', content, re.I)
-            if exp_match:
-                exp = float(exp_match.group(1))
-                if 0 < exp <= 5:
-                    result["expense_ratio"] = exp
+        # Fund Manager
+        manager_match = re.search(r'it is currently managed by ([A-Za-z\s&.,-]+)', text, re.I)
+        if manager_match:
+            result["fund_manager"] = manager_match.group(1).strip()[:120]
 
-            # Fund Manager
-            manager_match = re.search(r'it is currently managed by ([A-Za-z\s&.,-]+)', content, re.I)
-            if manager_match:
-                result["fund_manager"] = manager_match.group(1).strip()[:120]
+        # Launch Date
+        launch_match = re.search(r'Launched on ([A-Za-z]+\s+\d{1,2},?\s+\d{4})', text, re.I)
+        if launch_match:
+            result["launch_date"] = launch_match.group(1)
 
-            # Launch Date
-            launch_match = re.search(r'Launched on ([A-Za-z]+\s+\d{1,2},?\s+\d{4})', content, re.I)
-            if launch_match:
-                result["launch_date"] = launch_match.group(1)
-
-            await browser.close()
-            logger.info(f"✅ Playwright Success: {vr_url}")
-
+        logger.info(f"✅ VR Success: {vr_url}")
     except Exception as e:
-        logger.error(f"Playwright failed for {vr_url}: {e}")
-        result["error"] = str(e)
+        logger.warning(f"VR failed {vr_url}: {e}")
 
     return result
 
-def scrape_valueresearch(vr_url: str) -> Dict:
-    """Sync wrapper for Playwright"""
-    try:
-        return asyncio.run(scrape_valueresearch_playwright(vr_url))
-    except Exception as e:
-        logger.warning(f"Playwright wrapper failed: {e}")
-        return {"source": "Value Research", "error": str(e)}
-
-# ====================== MFAPI + CALCULATIONS ======================
-
 def fetch_mfapi_data(mfapi_id: int) -> dict:
-    import requests
     try:
-        r = requests.get(MFAPI_DETAIL.format(mfapi_id), timeout=15)
+        r = _get(MFAPI_DETAIL.format(mfapi_id))
         return r.json()
     except:
         return {}
@@ -160,8 +141,6 @@ def compute_risk_metrics(series: pd.Series) -> dict:
     daily_ret = series.pct_change().dropna()
     std_dev = round(daily_ret.std() * (252 ** 0.5) * 100, 2)
     return {"std_dev": std_dev}
-
-# ====================== MAIN FETCH ======================
 
 def fetch_scheme_data(scheme: dict) -> dict:
     result = {**scheme, "fetched_at": datetime.now().isoformat()}
