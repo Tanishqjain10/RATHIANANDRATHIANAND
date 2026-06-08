@@ -20,11 +20,20 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 
 from schemes import SCHEMES, CATEGORY_COLORS
-from modules.ingestion import fetch_scheme_data, get_holdings
-from modules.cleaning import (
-    build_summary_df, to_display_df,
-    compute_overlap_matrix, fmt_pct, fmt_cr
-)
+
+# Try both possible locations
+try:
+    from ingestion import fetch_scheme_data, get_holdings
+    from cleaning import build_summary_df, to_display_df, compute_overlap_matrix, fmt_pct, fmt_cr
+except ImportError:
+    # Fallback if modules folder exists
+    from modules.ingestion import fetch_scheme_data, get_holdings
+    from modules.cleaning import build_summary_df, to_display_df, compute_overlap_matrix, fmt_pct, fmt_cr#from schemes import SCHEMES, CATEGORY_COLORS
+#from modules.ingestion import fetch_scheme_data, get_holdings
+#from modules.cleaning import (
+   # build_summary_df, to_display_df,
+   # compute_overlap_matrix, fmt_pct, fmt_cr
+#)
 
 logging.basicConfig(level=logging.WARNING)
 
