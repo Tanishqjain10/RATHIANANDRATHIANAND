@@ -1,14 +1,14 @@
 """
 modules/ingestion.py
 -------------------
-ROBUST LIVE SCRAPER - Value Research Primary
-Improved label-based parsing + validation
+ROBUST LIVE SCRAPER - Value Research Primary Source
+With validation and detailed logging
 """
 
 import re
 import logging
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict
 
 import requests
 from bs4 import BeautifulSoup
@@ -19,12 +19,13 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 logger = logging.getLogger(__name__)
 
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36"
 }
 
 SESSION = requests.Session()
 SESSION.headers.update(HEADERS)
 
+# MFAPI for reliable NAV history
 MFAPI_DETAIL = "https://api.mfapi.in/mf/{}"
 
 MC_TO_MFAPI = {
@@ -38,72 +39,68 @@ MC_TO_MFAPI = {
 def _get(url: str, timeout: int = 20):
     return SESSION.get(url, timeout=timeout)
 
-# ====================== IMPROVED VALUE RESEARCH SCRAPER ======================
+# ====================== ROBUST VALUE RESEARCH SCRAPER ======================
 
-def scrape_valueresearch(vr_url: str) -> dict:
-    """Robust label-based extraction from Value Research"""
+def scrape_valueresearch(vr_url: str) -> Dict:
+    """Robust extraction with validation"""
     result = {"source": "Value Research", "url": vr_url}
     try:
         r = _get(vr_url)
         soup = BeautifulSoup(r.text, "lxml")
 
         # NAV
-        nav_tag = soup.find(string=re.compile(r"Current NAV|NAV", re.I))
-        if nav_tag:
-            parent = nav_tag.find_parent()
-            nav_match = re.search(r'₹?([\d,]+\.\d{2})', str(parent))
+        nav_text = soup.find(string=re.compile(r"Current NAV|NAV ₹", re.I))
+        if nav_text:
+            nav_match = re.search(r'₹?([\d,]+\.\d{2})', str(nav_text.parent))
             if nav_match:
                 nav = float(nav_match.group(1).replace(",", ""))
                 if nav > 0:
                     result["nav"] = nav
+                    logger.info(f"NAV extracted: {nav}")
 
         # AUM
-        aum_tag = soup.find(string=re.compile(r"AUM", re.I))
-        if aum_tag:
-            parent = aum_tag.find_parent()
-            aum_match = re.search(r'₹?([\d,]+\.?\d*)\s*Cr', str(parent), re.I)
+        aum_text = soup.find(string=re.compile(r"AUM", re.I))
+        if aum_text:
+            aum_match = re.search(r'₹?([\d,]+\.?\d*)\s*Cr', str(aum_text.parent), re.I)
             if aum_match:
                 result["aum_raw"] = f"₹{aum_match.group(1)} Cr"
+                logger.info(f"AUM extracted: {result['aum_raw']}")
 
         # Expense Ratio
-        exp_tag = soup.find(string=re.compile(r"Expense Ratio", re.I))
-        if exp_tag:
-            parent = exp_tag.find_parent()
-            exp_match = re.search(r'(\d+\.\d+)%', str(parent))
+        exp_text = soup.find(string=re.compile(r"Expense Ratio", re.I))
+        if exp_text:
+            exp_match = re.search(r'(\d+\.\d+)%', str(exp_text.parent))
             if exp_match:
                 exp = float(exp_match.group(1))
                 if 0 < exp <= 5:
                     result["expense_ratio"] = exp
+                    logger.info(f"Expense Ratio extracted: {exp}%")
 
         # Fund Manager
-        manager_tag = soup.find(string=re.compile(r"Fund Manager", re.I))
-        if manager_tag:
-            parent = manager_tag.find_parent()
+        manager_text = soup.find(string=re.compile(r"Fund Manager", re.I))
+        if manager_text:
+            parent = manager_text.find_parent()
             if parent:
                 result["fund_manager"] = parent.get_text(strip=True)[:100]
+                logger.info(f"Fund Manager: {result['fund_manager']}")
 
         # Launch Date
-        launch_tag = soup.find(string=re.compile(r"Launch Date|Inception Date", re.I))
-        if launch_tag:
-            parent = launch_tag.find_parent()
+        launch_text = soup.find(string=re.compile(r"Launch Date|Inception Date", re.I))
+        if launch_text:
+            parent = launch_text.find_parent()
             if parent:
-                result["launch_date"] = parent.get_text(strip=True)[:40]
+                date_str = parent.get_text(strip=True)
+                result["launch_date"] = date_str[:40]
+                logger.info(f"Launch Date: {date_str}")
 
-        # Category Rank
-        rank_tag = soup.find(string=re.compile(r"Rank", re.I))
-        if rank_tag:
-            rank_match = re.search(r'(\d+)', str(rank_tag.find_parent()))
-            if rank_match:
-                result["cat_rank"] = int(rank_match.group(1))
-
-        logger.info(f"✅ Robust VR scrape successful: {vr_url}")
+        logger.info(f"✅ VR scrape completed for {vr_url}")
     except Exception as e:
-        logger.warning(f"VR scrape error {vr_url}: {e}")
+        logger.error(f"VR scrape failed for {vr_url}: {e}")
         result["scrape_error"] = str(e)
 
     return result
 
-# ====================== MFAPI FUNCTIONS ======================
+# ====================== MFAPI FUNCTIONS (unchanged) ======================
 
 def fetch_mfapi_data(mfapi_id: int) -> dict:
     try:
@@ -171,15 +168,16 @@ def compute_risk_metrics(series: pd.Series) -> dict:
     std_dev = round(daily_ret.std() * (252 ** 0.5) * 100, 2)
     return {"std_dev": std_dev}
 
-# ====================== MAIN FETCH ======================
+# ====================== MAIN FETCH FUNCTION ======================
 
 def fetch_scheme_data(scheme: dict) -> dict:
+    """Main function"""
     result = {**scheme, "fetched_at": datetime.now().isoformat()}
 
-    # Primary: Value Research
+    # Primary Source: Value Research
     if scheme.get("vr_url"):
         vr_data = scrape_valueresearch(scheme["vr_url"])
-        result.update({k: v for k, v in vr_data.items() if v is not None and v != ""})
+        result.update({k: v for k, v in vr_data.items() if v is not None})
 
     # Fallback: MFAPI for returns & risk
     mfapi_id = MC_TO_MFAPI.get(scheme.get("mc_id"))
@@ -198,7 +196,7 @@ def fetch_scheme_data(scheme: dict) -> dict:
     return result
 
 def get_holdings(mc_id: str) -> dict:
-    """Holdings will be improved later. For now fallback"""
+    """Holdings extraction will be enhanced later"""
     return {
         "top_holdings": [],
         "sector": [],
