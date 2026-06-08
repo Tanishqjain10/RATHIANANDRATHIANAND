@@ -6,7 +6,7 @@ Value Research Primary (requests + BeautifulSoup)
 import re
 import logging
 from datetime import datetime, timedelta
-from typing import Optional, Dict
+from typing import Optional, Dict, List
 
 import requests
 from bs4 import BeautifulSoup
@@ -24,6 +24,14 @@ SESSION = requests.Session()
 SESSION.headers.update(HEADERS)
 
 MFAPI_DETAIL = "https://api.mfapi.in/mf/{}"
+
+SCHEME_URL_FIELDS = (
+    "vr_url",
+    "vr_performance",
+    "vr_risk",
+    "vr_portfolio",
+    "vr_other",
+)
 
 MC_TO_MFAPI = {
     "MES082": 119597, "MSB501": 125494, "MDS580": 119270, "MAG091": 145552,
@@ -76,6 +84,41 @@ def scrape_valueresearch(vr_url: str) -> Dict:
         logger.warning(f"VR failed {vr_url}: {e}")
 
     return result
+
+def provided_urls_for_scheme(scheme: dict) -> List[str]:
+    urls = []
+    for field in SCHEME_URL_FIELDS:
+        url = scheme.get(field)
+        if url and url not in urls:
+            urls.append(url)
+    return urls
+
+def scrape_all_valueresearch_urls(scheme: dict) -> Dict:
+    urls = provided_urls_for_scheme(scheme)
+    merged = {
+        "source": "Value Research",
+        "provided_urls": urls,
+        "fetched_urls": [],
+        "failed_urls": [],
+    }
+
+    for url in urls:
+        data = scrape_valueresearch(url)
+        has_live_fields = any(
+            key in data for key in ("nav", "aum_raw", "expense_ratio", "fund_manager", "launch_date")
+        )
+        if has_live_fields:
+            merged["fetched_urls"].append(url)
+            for key, value in data.items():
+                if value is not None and key not in ("source", "url"):
+                    merged[key] = value
+        else:
+            merged["failed_urls"].append(url)
+
+    merged["provided_url_count"] = len(urls)
+    merged["fetched_url_count"] = len(merged["fetched_urls"])
+    merged["failed_url_count"] = len(merged["failed_urls"])
+    return merged
 
 def fetch_mfapi_data(mfapi_id: int) -> dict:
     try:
@@ -138,15 +181,22 @@ def compute_returns(series: pd.Series) -> dict:
 def compute_risk_metrics(series: pd.Series) -> dict:
     if len(series) < 30:
         return {}
-    daily_ret = series.pct_change().dropna()
+    daily_ret = series.pct_change(fill_method=None).replace([np.inf, -np.inf], np.nan).dropna()
+    if daily_ret.empty:
+        return {}
     std_dev = round(daily_ret.std() * (252 ** 0.5) * 100, 2)
     return {"std_dev": std_dev}
 
 def fetch_scheme_data(scheme: dict) -> dict:
-    result = {**scheme, "fetched_at": datetime.now().isoformat()}
+    fetched_at = datetime.now()
+    result = {
+        **scheme,
+        "fetched_at": fetched_at.isoformat(),
+        "last_updated": fetched_at.strftime("%d %b %Y, %H:%M:%S"),
+    }
 
-    if scheme.get("vr_url"):
-        vr_data = scrape_valueresearch(scheme["vr_url"])
+    if provided_urls_for_scheme(scheme):
+        vr_data = scrape_all_valueresearch_urls(scheme)
         result.update({k: v for k, v in vr_data.items() if v is not None})
 
     mfapi_id = MC_TO_MFAPI.get(scheme.get("mc_id"))

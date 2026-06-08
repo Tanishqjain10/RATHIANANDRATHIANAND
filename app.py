@@ -102,16 +102,14 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
 # ─── Constants ───────────────────────────────────────────────────────────────
 REFRESH_INTERVAL = 300
-
-NIFTY_RETURNS = {
-    "ret_1y": 22.5, "cagr_3y": 14.8, "cagr_5y": 15.2, "inception": 12.0
-}
+REFRESH_INTERVAL_MS = REFRESH_INTERVAL * 1000
+REFRESH_LABEL = "5 min"
 
 # ─── Data loading (cached) ───────────────────────────────────────────────────
 @st.cache_data(ttl=REFRESH_INTERVAL, show_spinner=False)
 def load_all_data():
     all_data, all_holdings = [], {}
-    progress = st.progress(0, text="Fetching live fund data from Value Research…")
+    progress = st.progress(0, text="Fetching live data from all configured URLs...")
     for i, scheme in enumerate(SCHEMES):
         progress.progress((i + 1) / len(SCHEMES),
                           text=f"Loading {scheme['short_name']}…")
@@ -182,14 +180,14 @@ st.markdown("""
 
 # ─── Auto Refresh Logic (with fallback) ──────────────────────────────────────
 if AUTO_REFRESH_AVAILABLE and auto_refresh:
-    st_autorefresh(interval=60 * 1000, limit=100, key="autorefresh")
+    st_autorefresh(interval=REFRESH_INTERVAL_MS, limit=100, key="autorefresh")
 else:
     if auto_refresh:
-        st.markdown("""
+        st.markdown(f"""
         <script>
-        setTimeout(function() {
+        setTimeout(function() {{
             window.location.reload();
-        }, 60000);
+        }}, {REFRESH_INTERVAL_MS});
         </script>
         """, unsafe_allow_html=True)
 
@@ -206,21 +204,46 @@ else:
     df_filtered = df
     filtered_data = all_data
 
-now_str = datetime.now().strftime("%d %b %Y, %H:%M:%S")
+latest_fetch = max(
+    (d for d in all_data if d.get("fetched_at")),
+    key=lambda d: d["fetched_at"],
+    default={},
+)
+last_updated = latest_fetch.get("last_updated", "Not fetched yet")
+total_provided_urls = int(df.get("provided_url_count", pd.Series(dtype=int)).sum())
+total_fetched_urls = int(df.get("fetched_url_count", pd.Series(dtype=int)).sum())
 
 # ─── Status bar ──────────────────────────────────────────────────────────────
 c1, c2 = st.columns([8, 2])
 with c1:
     st.markdown(f"""
     <span class="live-badge">
-        <span class="live-dot"></span> LIVE &nbsp;|&nbsp; Last updated: {now_str}
+        <span class="live-dot"></span> LIVE &nbsp;|&nbsp; Last Updated: {last_updated}
     </span>
     """, unsafe_allow_html=True)
 with c2:
-    st.markdown(f"<p class='source-note' style='text-align:right'>Auto-refresh: {'ON ✓' if auto_refresh else 'OFF'}</p>",
+    st.markdown(f"<p class='source-note' style='text-align:right'>Auto-refresh: {'ON' if auto_refresh else 'OFF'} ({REFRESH_LABEL})</p>",
                 unsafe_allow_html=True)
 
 # ─── Section A: KPI Summary ───────────────────────────────────────────────────
+with st.expander("Live data source audit", expanded=False):
+    audit_cols = [
+        "short_name",
+        "provided_url_count",
+        "fetched_url_count",
+        "failed_url_count",
+        "last_updated",
+    ]
+    audit_df = df[[c for c in audit_cols if c in df.columns]].rename(columns={
+        "short_name": "Fund",
+        "provided_url_count": "URLs Provided",
+        "fetched_url_count": "URLs Fetched",
+        "failed_url_count": "URLs Pending",
+        "last_updated": "Last Updated",
+    })
+    st.dataframe(audit_df, use_container_width=True, hide_index=True)
+    st.caption("The dashboard refreshes cached live data every 5 minutes and uses the URLs configured in schemes.py.")
+
 st.markdown("<div class='section-header'>A · Portfolio Summary</div>", unsafe_allow_html=True)
 
 valid_cagr5 = df["cagr_5y"].dropna()
@@ -234,7 +257,7 @@ kpi_data = [
     ("Avg Expense", fmt_pct(valid_exp.mean(), 2) if not valid_exp.empty else "N/A", "average TER"),
     ("Avg 3Y CAGR", fmt_pct(valid_cagr3.mean(), 1) if not valid_cagr3.empty else "N/A", "3-year CAGR"),
     ("Avg Std Dev", fmt_pct(valid_std.mean(), 1) if not valid_std.empty else "N/A", "annualised volatility"),
-    ("Data Source", "Value Research + MFAPI", "live feed"),
+    ("Live URLs", f"{total_fetched_urls}/{total_provided_urls}", "configured URLs fetched"),
 ]
 
 kpi_cols = st.columns(len(kpi_data))
@@ -345,6 +368,6 @@ with tabs[7]:
 # ─── Footer ───────────────────────────────────────────────────────────────────
 st.markdown("""
 <p class="source-note" style="text-align:center; margin-top:20px;">
-Auto-refresh every 60 seconds • Primary source: Value Research
+Auto-refresh every 5 minutes • Primary source: Value Research + mfapi.in
 </p>
 """, unsafe_allow_html=True)

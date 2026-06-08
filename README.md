@@ -72,11 +72,9 @@ docker run -p 8501:8501 mf-dashboard
 
 | Data | Source | Refresh |
 |------|--------|---------|
-| NAV History & Returns | [mfapi.in](https://api.mfapi.in) | Real-time (Streamlit cache 5 min) |
-| AUM, Expense Ratio, Fund Manager | MoneyControl (scrape) | Best-effort |
-| Holdings & Sector Allocation | SEBI Monthly Disclosures | Monthly snapshot (hardcoded latest) |
-| Fund Flows | AMFI India (illustrative) | Monthly |
-| Benchmark | Nifty 50 TRI (hardcoded latest) | Quarterly update |
+| Scheme facts, AUM, TER, manager, launch details | All Value Research URLs configured in `schemes.py` | Automatic, cached 5 min |
+| NAV history, NAV date, returns, CAGR, volatility | [mfapi.in](https://api.mfapi.in) | Automatic, cached 5 min |
+| Last updated status and URL fetch audit | Runtime ingestion metadata | Shown on every dashboard refresh |
 
 ---
 
@@ -84,11 +82,10 @@ docker run -p 8501:8501 mf-dashboard
 
 | Issue | Reason | Workaround |
 |-------|--------|------------|
-| AUM shows N/A | MoneyControl uses dynamic JS rendering | Install Playwright + use `playwright fetch` branch |
+| AUM shows N/A | Source page markup may change or block scraping | Check the relevant Value Research URL in `schemes.py` |
 | Beta not shown | Requires NSE daily index data | Subscribe NSE Data APIs or use nsepy library |
 | Fund flows are illustrative | AMFI publishes only category-level monthly data | Use AMFI Excel download + parse |
-| Holdings are static | MC portfolio pages need headless browser | Schedule monthly Selenium scraper |
-| Invesco Smallcap URL (Google redirect) | Google share link doesn't resolve to MC directly | Manually replaced with MC direct URL in code |
+| Holdings are empty | No holdings endpoint is configured yet | Add a live holdings disclosure URL per scheme |
 
 ---
 
@@ -97,7 +94,6 @@ docker run -p 8501:8501 mf-dashboard
 Edit `app.py` top section:
 ```python
 REFRESH_INTERVAL = 300   # seconds (5 minutes)
-NIFTY_RETURNS = { ... }  # Update benchmark returns quarterly
 ```
 
 Edit `schemes.py` to add/remove schemes or update weights.

@@ -63,6 +63,9 @@ DISPLAY_COLS = [
     "num_stocks",
     "fund_manager",
     "launch_date",
+    "last_updated",
+    "fetched_url_count",
+    "provided_url_count",
 ]
 
 RENAME = {
@@ -85,6 +88,9 @@ RENAME = {
     "num_stocks":     "# Stocks",
     "fund_manager":   "Fund Manager",
     "launch_date":    "Launch",
+    "last_updated":   "Last Updated",
+    "fetched_url_count": "URLs Fetched",
+    "provided_url_count": "URLs Provided",
 }
 
 
@@ -120,6 +126,14 @@ def build_summary_df(all_data: list) -> pd.DataFrame:
             "num_stocks":    d.get("num_stocks"),
             "fund_manager":  d.get("fund_manager", ""),
             "launch_date":   d.get("launch_date", ""),
+            "last_updated":   d.get("last_updated", ""),
+            "provided_urls":  d.get("provided_urls", []),
+            "fetched_urls":   d.get("fetched_urls", []),
+            "failed_urls":    d.get("failed_urls", []),
+            "provided_url_count": d.get("provided_url_count", 0),
+            "fetched_url_count":  d.get("fetched_url_count", 0),
+            "failed_url_count":   d.get("failed_url_count", 0),
+            "fetched_at":     d.get("fetched_at"),
         }
         rows.append(row)
 
