@@ -1,6 +1,6 @@
 """
-ingestion.py - PRODUCTION VERSION (requests + BeautifulSoup)
-Value Research Primary Source
+ingestion.py - PRODUCTION VERSION
+Value Research Primary (requests + BeautifulSoup)
 """
 
 import re
