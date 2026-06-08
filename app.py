@@ -296,6 +296,13 @@ with st.expander("Live API health", expanded=True):
     })
     api_health = api_health[["Fund", "API ID", "Status", "NAV", "NAV Date", "1Y Return", "3Y CAGR", "Last Updated"]]
     st.dataframe(api_health, use_container_width=True, hide_index=True)
+    st.download_button(
+        "Download live API health CSV",
+        data=api_health.to_csv(index=False).encode("utf-8"),
+        file_name="live_api_health.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
     st.caption("Priority live feed: mfapi.in. If every row shows OK and NAV/NAV Date are filled, the live API is working.")
 
 st.markdown("<div class='section-header'>A · Portfolio Summary</div>", unsafe_allow_html=True)
@@ -381,6 +388,13 @@ with tabs[0]:
             "Wt %": st.column_config.NumberColumn("Wt %", format="%d%%"),
         },
     )
+    st.download_button(
+        "Download comparison CSV",
+        data=disp.to_csv(index=False).encode("utf-8"),
+        file_name="scheme_comparison.csv",
+        mime="text/csv",
+        use_container_width=True,
+    )
 
     st.markdown("""
     <p class="source-note">
@@ -465,6 +479,49 @@ with tabs[1]:
             labels={"std_dev_num": "Std Dev (%)", "cagr_3y_num": "3Y CAGR (%)"},
         )
         st.plotly_chart(apply_theme(risk_fig), use_container_width=True)
+
+    insight_left, insight_right = st.columns([1, 1])
+    with insight_left:
+        st.markdown("<div class='section-header'>Top / Bottom 1Y Performers</div>", unsafe_allow_html=True)
+        perf_cols = ["short_name", "category", "weight", "ret_1y", "cagr_3y", "std_dev"]
+        perf_df = df_filtered[[c for c in perf_cols if c in df_filtered.columns]].copy()
+        perf_df["ret_1y_num"] = num_col(perf_df, "ret_1y")
+        perf_df = perf_df.dropna(subset=["ret_1y_num"]).sort_values("ret_1y_num", ascending=False)
+        if perf_df.empty:
+            st.warning("1Y performance data is not available yet.")
+        else:
+            top_bottom = pd.concat([perf_df.head(3), perf_df.tail(3)]).drop_duplicates()
+            top_bottom = top_bottom.rename(columns={
+                "short_name": "Fund",
+                "category": "Category",
+                "weight": "Wt %",
+                "ret_1y": "1Y Return",
+                "cagr_3y": "3Y CAGR",
+                "std_dev": "Std Dev",
+            })
+            st.dataframe(top_bottom[["Fund", "Category", "Wt %", "1Y Return", "3Y CAGR", "Std Dev"]], use_container_width=True, hide_index=True)
+
+    with insight_right:
+        st.markdown("<div class='section-header'>Weighted Return Contribution</div>", unsafe_allow_html=True)
+        contrib_df = df_filtered[["short_name", "category", "weight", "ret_1y"]].copy()
+        contrib_df["weight_num"] = num_col(contrib_df, "weight")
+        contrib_df["ret_1y_num"] = num_col(contrib_df, "ret_1y")
+        contrib_df = contrib_df.dropna(subset=["weight_num", "ret_1y_num"])
+        if contrib_df.empty:
+            st.warning("Contribution data needs both weights and 1Y returns.")
+        else:
+            contrib_df["Contribution"] = contrib_df["weight_num"] * contrib_df["ret_1y_num"] / 100
+            contrib_df = contrib_df.sort_values("Contribution", ascending=False)
+            contrib_fig = px.bar(
+                contrib_df,
+                x="Contribution",
+                y="short_name",
+                color="category",
+                orientation="h",
+                labels={"short_name": "Fund", "Contribution": "Contribution to 1Y Return (%)"},
+                color_discrete_map=CATEGORY_COLORS,
+            )
+            st.plotly_chart(apply_theme(contrib_fig), use_container_width=True)
 
 # ─── Tab 3 to 8 ───────────────────────────────────────────────────────────────
 with tabs[2]:
