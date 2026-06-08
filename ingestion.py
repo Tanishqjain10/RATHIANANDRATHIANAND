@@ -1,5 +1,5 @@
 """
-modules/ingestion.py - FINAL LIVE VERSION
+ingestion.py - FINAL LIVE VERSION
 """
 
 import re
@@ -15,14 +15,11 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 
 logger = logging.getLogger(__name__)
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-}
+HEADERS = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
 SESSION = requests.Session()
 SESSION.headers.update(HEADERS)
 
-# MFAPI
 MFAPI_DETAIL = "https://api.mfapi.in/mf/{}"
 
 MC_TO_MFAPI = {
@@ -40,40 +37,36 @@ def scrape_valueresearch(vr_url: str) -> dict:
     result = {"source": "Value Research", "url": vr_url}
     try:
         r = _get(vr_url)
-        soup = BeautifulSoup(r.text, "lxml")
+        text = r.text
 
         # NAV
-        nav_match = re.search(r'Current NAV.*?₹?([\d,]+\.\d{2})', r.text, re.I)
+        nav_match = re.search(r'Current NAV.*?₹?([\d,]+\.\d{2})', text, re.I)
         if nav_match:
             nav = float(nav_match.group(1).replace(",", ""))
             if nav > 0:
                 result["nav"] = nav
 
         # AUM
-        aum_match = re.search(r'AUM.*?₹?([\d,]+\.?\d*)\s*Cr', r.text, re.I)
+        aum_match = re.search(r'AUM.*?₹?([\d,]+\.?\d*)\s*Cr', text, re.I)
         if aum_match:
             result["aum_raw"] = f"₹{aum_match.group(1)} Cr"
 
         # Expense Ratio
-        exp_match = re.search(r'Expense Ratio.*?(\d+\.\d+)%', r.text, re.I)
+        exp_match = re.search(r'Expense Ratio.*?(\d+\.\d+)%', text, re.I)
         if exp_match:
             exp = float(exp_match.group(1))
             if 0 < exp <= 5:
                 result["expense_ratio"] = exp
 
         # Fund Manager
-        manager = soup.find(string=re.compile("Fund Manager", re.I))
-        if manager:
-            parent = manager.find_parent()
-            if parent:
-                result["fund_manager"] = parent.get_text(strip=True)[:100]
+        manager_match = re.search(r'Fund Manager.*?:?\s*([A-Za-z\s&.,-]+)', text, re.I)
+        if manager_match:
+            result["fund_manager"] = manager_match.group(1).strip()[:100]
 
         # Launch Date
-        launch = soup.find(string=re.compile("Launch Date|Inception", re.I))
-        if launch:
-            parent = launch.find_parent()
-            if parent:
-                result["launch_date"] = parent.get_text(strip=True)[:50]
+        launch_match = re.search(r'Launch Date.*?(\d{1,2}\s+[A-Za-z]+\s+\d{4})', text, re.I)
+        if launch_match:
+            result["launch_date"] = launch_match.group(1)
 
         logger.info(f"✅ VR Success: {vr_url}")
     except Exception as e:
