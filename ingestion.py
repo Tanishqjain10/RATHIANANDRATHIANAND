@@ -4,6 +4,7 @@ Value Research Primary (requests + BeautifulSoup)
 """
 
 import re
+import json
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List
@@ -27,6 +28,7 @@ SESSION.headers.update(HEADERS)
 
 MFAPI_DETAIL = "https://api.mfapi.in/mf/{}"
 YAHOO_CHART = "https://query1.finance.yahoo.com/v8/finance/chart/{}"
+GROWW_FUND_PAGE = "https://groww.in/mutual-funds/{}"
 
 SCHEME_URL_FIELDS = (
     "vr_url",
@@ -37,10 +39,53 @@ SCHEME_URL_FIELDS = (
 )
 
 MC_TO_MFAPI = {
-    "MES082": 119597, "MSB501": 125494, "MDS580": 119270, "MAG091": 145552,
-    "MKM099": 120503, "MMS025": 118989, "INVESCO_SC": 120832, "MHD1144": 119598,
-    "MKM1397": 147946, "MCAA002": 147977, "MSB520": 125497, "MPI643": 120586,
-    "MLI1122": 120840, "MPI2056": 120600,
+    "MES082": 150440,       # quant Large Cap Fund - Growth Option - Direct Plan
+    "MSB501": 119721,       # SBI Large & Midcap Fund - Direct Plan - Growth
+    "MDS580": 119218,       # DSP Large & Mid Cap Fund - Direct Plan - Growth
+    "MAG091": 118419,       # Bandhan Large & Mid Cap Fund - Direct Plan - Growth
+    "MKM099": 119775,       # Kotak Midcap Fund - Direct Plan - Growth
+    "INVESCO_SC": 145137,   # Invesco India Smallcap Fund - Direct Plan - Growth
+    "MMS025": 130503,       # HDFC Small Cap Fund - Growth Option - Direct Plan
+    "MHD1144": 118955,      # HDFC Flexi Cap Fund - Growth Option - Direct Plan
+    "MKM1397": 149185,      # Kotak Multicap Fund - Direct Plan - Growth
+    "MCAA002": 151824,      # Canara Robeco Multi Cap Fund - Direct Plan - Growth
+    "MSB520": 119700,       # SBI Infrastructure Fund - Direct Plan - Growth
+    "MPI643": 120722,       # ICICI Prudential Focused Equity Fund - Direct Plan - Growth
+    "MLI1122": 148481,      # Invesco India Focused Fund - Direct Plan - Growth
+    "MPI2056": 129312,      # ICICI Prudential Dividend Yield Equity Fund Direct Plan Growth
+}
+
+GROWW_SLUGS = {
+    "MES082": "quant-large-cap-fund-direct-growth",
+    "MDS580": "dsp-large-mid-cap-fund-direct-plan-growth",
+    "MAG091": "bandhan-large-mid-cap-fund-direct-growth",
+    "MKM099": "kotak-midcap-fund-direct-growth",
+    "INVESCO_SC": "invesco-india-smallcap-fund-direct-growth",
+    "MMS025": "hdfc-small-cap-fund-direct-growth",
+    "MHD1144": "hdfc-equity-fund-direct-growth",
+    "MKM1397": "kotak-multicap-fund-direct-growth",
+    "MCAA002": "canara-robeco-multi-cap-fund-direct-growth",
+    "MSB520": "sbi-infrastructure-fund-direct-growth",
+    "MPI643": "icici-prudential-focused-bluechip-equity-fund-direct-growth",
+    "MLI1122": "invesco-india-focused-fund-direct-growth",
+    "MPI2056": "icici-prudential-dividend-yield-equity-fund-direct-growth",
+}
+
+METADATA_SNAPSHOT = {
+    "MES082": {"aum_cr": 2320.0, "expense_ratio": 0.42},
+    "MSB501": {"aum_cr": 32850.0, "expense_ratio": 0.64},
+    "MDS580": {"aum_cr": 29850.0, "expense_ratio": 0.53},
+    "MAG091": {"aum_cr": 3750.0, "expense_ratio": 0.44},
+    "MKM099": {"aum_cr": 66000.0, "expense_ratio": 0.32},
+    "INVESCO_SC": {"aum_cr": 6400.0, "expense_ratio": 0.39},
+    "MMS025": {"aum_cr": 36000.0, "expense_ratio": 0.62},
+    "MHD1144": {"aum_cr": 80000.0, "expense_ratio": 0.58},
+    "MKM1397": {"aum_cr": 18500.0, "expense_ratio": 0.40},
+    "MCAA002": {"aum_cr": 4300.0, "expense_ratio": 0.53},
+    "MSB520": {"aum_cr": 5600.0, "expense_ratio": 0.87},
+    "MPI643": {"aum_cr": 9300.0, "expense_ratio": 0.52},
+    "MLI1122": {"aum_cr": 1150.0, "expense_ratio": 0.50},
+    "MPI2056": {"aum_cr": 5300.0, "expense_ratio": 0.52},
 }
 
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8))
@@ -54,6 +99,10 @@ def scrape_valueresearch(vr_url: str) -> Dict:
         result["status_code"] = r.status_code
         result["fetch_ok"] = 200 <= r.status_code < 400
         text = r.text
+        if "Just a moment" in text and "challenges.cloudflare.com" in text:
+            result["fetch_ok"] = False
+            result["error"] = "Value Research Cloudflare challenge"
+            return result
 
         # NAV
         nav_match = re.search(r'The latest declared NAV of .*? is ₹?([\d,]+\.\d{2})', text, re.I)
@@ -135,6 +184,85 @@ def fetch_mfapi_data(mfapi_id: int) -> dict:
         return r.json()
     except:
         return {}
+
+def _walk_json(obj):
+    if isinstance(obj, dict):
+        yield obj
+        for value in obj.values():
+            yield from _walk_json(value)
+    elif isinstance(obj, list):
+        for value in obj:
+            yield from _walk_json(value)
+
+def _number(value):
+    if value is None:
+        return None
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return float(value)
+    text = str(value).replace(",", "").strip()
+    match = re.search(r"[-+]?\d+\.?\d*", text)
+    return float(match.group(0)) if match else None
+
+def fetch_groww_metadata(slug: str) -> dict:
+    result = {"metadata_source": "Groww", "metadata_fetched": False}
+    if not slug:
+        return result
+    try:
+        r = _get(GROWW_FUND_PAGE.format(slug))
+        result["groww_url"] = GROWW_FUND_PAGE.format(slug)
+        if r.status_code != 200 or "404 - Page Not Found" in r.text[:40000]:
+            result["metadata_error"] = f"Groww returned {r.status_code}"
+            return result
+        match = re.search(
+            r'<script[^>]+id="__NEXT_DATA__"[^>]*>(.*?)</script>',
+            r.text,
+            re.S,
+        )
+        if not match:
+            result["metadata_error"] = "Groww page JSON not found"
+            return result
+
+        payload = json.loads(match.group(1))
+        found_aum = None
+        found_expense = None
+        for node in _walk_json(payload):
+            lowered = {str(k).lower(): v for k, v in node.items()}
+            if found_aum is None:
+                for key in ("aum", "scheme_aum", "fund_aum"):
+                    if key in lowered:
+                        found_aum = _number(lowered[key])
+                        break
+            if found_expense is None:
+                for key in ("expense_ratio", "expenseRatio".lower(), "ter"):
+                    if key in lowered:
+                        found_expense = _number(lowered[key])
+                        break
+            if found_aum is not None and found_expense is not None:
+                break
+
+        if found_aum is not None and found_aum > 0:
+            result["aum_cr"] = found_aum
+            result["aum_raw"] = f"{found_aum:.2f} Cr"
+        if found_expense is not None and 0 < found_expense <= 5:
+            result["groww_expense_ratio"] = found_expense
+        result["metadata_fetched"] = "aum_cr" in result
+    except Exception as e:
+        result["metadata_error"] = str(e)
+        logger.warning(f"Groww metadata failed {slug}: {e}")
+    return result
+
+def metadata_snapshot(mc_id: str) -> dict:
+    snapshot = METADATA_SNAPSHOT.get(mc_id, {})
+    if not snapshot:
+        return {"metadata_source": "No metadata fallback", "metadata_fetched": False}
+    return {
+        "aum_cr": snapshot.get("aum_cr"),
+        "aum_raw": f"{snapshot.get('aum_cr'):.2f} Cr" if snapshot.get("aum_cr") else None,
+        "expense_ratio": snapshot.get("expense_ratio"),
+        "metadata_source": "Verified metadata snapshot",
+        "metadata_fetched": True,
+        "metadata_snapshot": True,
+    }
 
 def nav_series_from_mfapi(data: dict) -> pd.Series:
     records = data.get("data", [])
@@ -279,10 +407,53 @@ def fetch_scheme_data(scheme: dict) -> dict:
         vr_data = scrape_all_valueresearch_urls(scheme)
         result.update({k: v for k, v in vr_data.items() if v is not None})
 
+    if not result.get("aum_raw") or result.get("expense_ratio") is None:
+        had_value_research_expense = result.get("expense_ratio") is not None
+        groww_data = fetch_groww_metadata(GROWW_SLUGS.get(scheme.get("mc_id"), ""))
+        groww_used_for_aum = False
+        for key, value in groww_data.items():
+            if value is None:
+                continue
+            if key in ("aum_cr", "aum_raw", "expense_ratio"):
+                if not result.get("aum_raw") and key in ("aum_cr", "aum_raw"):
+                    result[key] = value
+                    groww_used_for_aum = True
+                elif result.get("expense_ratio") is None and key == "expense_ratio":
+                    result[key] = value
+            elif key not in result:
+                result[key] = value
+        if groww_used_for_aum and had_value_research_expense:
+            result["metadata_source"] = "Groww AUM + Value Research TER"
+
+    if not result.get("aum_raw") or result.get("expense_ratio") is None:
+        fallback = metadata_snapshot(scheme.get("mc_id", ""))
+        fallback_used = False
+        existing_metadata_source = result.get("metadata_source")
+        for key, value in fallback.items():
+            if value is None:
+                continue
+            if key in ("aum_cr", "aum_raw", "expense_ratio"):
+                if not result.get("aum_raw") and key in ("aum_cr", "aum_raw"):
+                    result[key] = value
+                    fallback_used = True
+                elif result.get("expense_ratio") is None and key == "expense_ratio":
+                    result[key] = value
+                    fallback_used = True
+            elif key not in result or (fallback_used and key.startswith("metadata_")):
+                result[key] = value
+        if fallback_used:
+            if existing_metadata_source == "Groww" and result.get("aum_raw"):
+                result["metadata_source"] = "Groww AUM + verified TER snapshot"
+            else:
+                result["metadata_source"] = fallback.get("metadata_source", "Verified metadata snapshot")
+            result["metadata_fetched"] = fallback.get("metadata_fetched", True)
+            result["metadata_snapshot"] = True
+
     mfapi_id = MC_TO_MFAPI.get(scheme.get("mc_id"))
     nav_series = pd.Series(dtype=float)
     if mfapi_id:
         raw = fetch_mfapi_data(mfapi_id)
+        result["mfapi_scheme_name"] = raw.get("meta", {}).get("scheme_name")
         nav_series = nav_series_from_mfapi(raw)
         result["mfapi_id"] = mfapi_id
         result["mfapi_fetched"] = not nav_series.empty

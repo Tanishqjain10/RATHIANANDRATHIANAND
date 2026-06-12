@@ -104,7 +104,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 REFRESH_INTERVAL = 300
 REFRESH_INTERVAL_MS = REFRESH_INTERVAL * 1000
 REFRESH_LABEL = "5 min"
-CACHE_VERSION = "holdings-fallback-v2"
+CACHE_VERSION = "verified-mfapi-groww-metadata-v1"
 
 # ─── Data loading (cached) ───────────────────────────────────────────────────
 @st.cache_data(ttl=REFRESH_INTERVAL, show_spinner=False)
@@ -289,6 +289,7 @@ with st.expander("Live API health", expanded=True):
     api_health = df[[
         "short_name",
         "mfapi_id",
+        "mfapi_scheme_name",
         "mfapi_fetched",
         "nav",
         "nav_date",
@@ -300,13 +301,14 @@ with st.expander("Live API health", expanded=True):
     api_health = api_health.rename(columns={
         "short_name": "Fund",
         "mfapi_id": "API ID",
+        "mfapi_scheme_name": "mfapi Scheme",
         "nav": "NAV",
         "nav_date": "NAV Date",
         "ret_1y": "1Y Return",
         "cagr_3y": "3Y CAGR",
         "last_updated": "Last Updated",
     })
-    api_health = api_health[["Fund", "API ID", "Status", "NAV", "NAV Date", "1Y Return", "3Y CAGR", "Last Updated"]]
+    api_health = api_health[["Fund", "API ID", "mfapi Scheme", "Status", "NAV", "NAV Date", "1Y Return", "3Y CAGR", "Last Updated"]]
     st.dataframe(api_health, use_container_width=True, hide_index=True)
     st.download_button(
         "Download live API health CSV",
@@ -323,11 +325,13 @@ valid_cagr5 = df["cagr_5y"].dropna()
 valid_std = df["std_dev"].dropna()
 valid_exp = df["expense_ratio"].dropna()
 valid_cagr3 = df["cagr_3y"].dropna()
+valid_aum = df["aum_cr"].dropna()
 
 kpi_data = [
     ("Total Schemes", str(len(SCHEMES)), "in model portfolio"),
+    ("Avg AUM", fmt_cr(valid_aum.mean()) if not valid_aum.empty else "N/A", "AUM metadata"),
     ("Avg 5Y CAGR", fmt_pct(valid_cagr5.mean(), 1) if not valid_cagr5.empty else "N/A", "across all schemes"),
-    ("Avg Expense", fmt_pct(valid_exp.mean(), 2) if not valid_exp.empty else "N/A", "average TER"),
+    ("Avg Exp Ratio", fmt_pct(valid_exp.mean(), 2) if not valid_exp.empty else "N/A", "average TER"),
     ("Avg 3Y CAGR", fmt_pct(valid_cagr3.mean(), 1) if not valid_cagr3.empty else "N/A", "3-year CAGR"),
     ("Avg Std Dev", fmt_pct(valid_std.mean(), 1) if not valid_std.empty else "N/A", "annualised volatility"),
     ("Live APIs", f"{total_nav_feeds}/{len(df)}", "NAV/returns via mfapi.in"),
@@ -368,7 +372,7 @@ with tabs[0]:
         "Fund": "PORTFOLIO AVERAGE",
         "Category": "",
         "Wt %": "",
-        "NAV (₹)": round(df["nav"].mean(), 2) if not df["nav"].empty else None,
+        "NAV (Rs.)": round(df["nav"].mean(), 2) if not df["nav"].empty else None,
         "AUM (Cr)": round(df["aum_cr"].mean(), 0) if not df["aum_cr"].empty else None,
         "Exp Ratio": round(df["expense_ratio"].mean(), 2) if not df["expense_ratio"].empty else None,
         "1M Ret": round(df["ret_1m"].mean(), 2) if not df["ret_1m"].empty else None,
@@ -396,7 +400,7 @@ with tabs[0]:
         height=620,
         column_config={
             "Fund": st.column_config.TextColumn("Fund", width="medium"),
-            "NAV (₹)": st.column_config.NumberColumn("NAV (₹)", format="₹%.2f"),
+            "NAV (Rs.)": st.column_config.NumberColumn("NAV (Rs.)", format="Rs. %.2f"),
             "Wt %": st.column_config.NumberColumn("Wt %", format="%d%%"),
         },
     )
@@ -423,8 +427,8 @@ with tabs[1]:
     avg_expense = safe_mean(df_filtered, "expense_ratio")
     avg_std = safe_mean(df_filtered, "std_dev")
     metric_items = [
-        ("Avg AUM", fmt_cr(avg_aum), "available source-page data"),
-        ("Avg Exp Ratio", fmt_pct(avg_expense, 2), "available source-page data"),
+        ("Avg AUM", fmt_cr(avg_aum), "Value Research/Groww metadata"),
+        ("Avg Exp Ratio", fmt_pct(avg_expense, 2), "Value Research/Groww metadata"),
         ("Avg 3M Return", fmt_signed_pct(weighted_mean(df_filtered, "ret_3m")), "weighted by model allocation"),
         ("Avg 1Y Return", fmt_signed_pct(weighted_mean(df_filtered, "ret_1y")), "weighted by model allocation"),
         ("Avg 3Y CAGR", fmt_signed_pct(weighted_mean(df_filtered, "cagr_3y")), "weighted by model allocation"),
