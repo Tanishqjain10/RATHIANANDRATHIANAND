@@ -104,7 +104,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 REFRESH_INTERVAL = 300
 REFRESH_INTERVAL_MS = REFRESH_INTERVAL * 1000
 REFRESH_LABEL = "5 min"
-CACHE_VERSION = "verified-mfapi-groww-metadata-v1"
+CACHE_VERSION = "manager-stocks-table-v1"
 
 # ─── Data loading (cached) ───────────────────────────────────────────────────
 @st.cache_data(ttl=REFRESH_INTERVAL, show_spinner=False)
@@ -116,7 +116,9 @@ def load_all_data(cache_version=CACHE_VERSION):
                           text=f"Loading {scheme['short_name']}…")
         data = fetch_scheme_data(scheme)
         all_data.append(data)
-        all_holdings[scheme["mc_id"]] = get_holdings(scheme)
+        holdings = get_holdings(scheme)
+        data["num_stocks"] = holdings.get("num_stocks")
+        all_holdings[scheme["mc_id"]] = holdings
         time.sleep(0.15)
     progress.empty()
     return all_data, all_holdings
@@ -382,6 +384,8 @@ with tabs[0]:
         "3Y CAGR": round(df["cagr_3y"].mean(), 2) if not df["cagr_3y"].empty else None,
         "5Y CAGR": round(df["cagr_5y"].mean(), 2) if not df["cagr_5y"].empty else None,
         "Std Dev": round(df["std_dev"].mean(), 2) if not df["std_dev"].empty else None,
+        "# Stocks": round(df["num_stocks"].mean(), 0) if "num_stocks" in df and not df["num_stocks"].empty else None,
+        "Fund Manager": "",
     }
 
     # Portfolio Total Row
@@ -390,6 +394,8 @@ with tabs[0]:
         "Category": "",
         "Wt %": "100%",
         "AUM (Cr)": round(df["aum_cr"].sum(), 0) if not df["aum_cr"].empty else None,
+        "# Stocks": "",
+        "Fund Manager": "",
     }
 
     disp = pd.concat([disp, pd.DataFrame([avg_row, total_row])], ignore_index=True)

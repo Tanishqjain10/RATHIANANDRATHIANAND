@@ -88,6 +88,10 @@ METADATA_SNAPSHOT = {
     "MPI2056": {"aum_cr": 5300.0, "expense_ratio": 0.52},
 }
 
+FUND_MANAGER_SNAPSHOT = {
+    "MSB501": "Saurabh Pant",
+}
+
 @retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8))
 def _get(url: str, timeout: int = 20):
     return SESSION.get(url, timeout=timeout)
@@ -124,9 +128,14 @@ def scrape_valueresearch(vr_url: str) -> Dict:
                 result["expense_ratio"] = exp
 
         # Fund Manager
-        manager_match = re.search(r'it is currently managed by ([A-Za-z\s&.,-]+)', text, re.I)
+        manager_match = re.search(
+            r"it is currently managed by\s+(.+?)(?:\.|\s+The fund has|\s+Launched on|$)",
+            text,
+            re.I | re.S,
+        )
         if manager_match:
-            result["fund_manager"] = manager_match.group(1).strip()[:120]
+            manager = re.sub(r"\s+", " ", manager_match.group(1)).strip(" .")
+            result["fund_manager"] = manager[:120]
 
         # Launch Date
         launch_match = re.search(r'Launched on ([A-Za-z]+\s+\d{1,2},?\s+\d{4})', text, re.I)
@@ -225,6 +234,7 @@ def fetch_groww_metadata(slug: str) -> dict:
         payload = json.loads(match.group(1))
         found_aum = None
         found_expense = None
+        found_manager = None
         for node in _walk_json(payload):
             lowered = {str(k).lower(): v for k, v in node.items()}
             if found_aum is None:
@@ -237,7 +247,12 @@ def fetch_groww_metadata(slug: str) -> dict:
                     if key in lowered:
                         found_expense = _number(lowered[key])
                         break
-            if found_aum is not None and found_expense is not None:
+            if found_manager is None:
+                for key in ("fund_manager", "fundmanager", "manager"):
+                    if key in lowered and lowered[key]:
+                        found_manager = re.sub(r"\s+", " ", str(lowered[key])).strip()
+                        break
+            if found_aum is not None and found_expense is not None and found_manager is not None:
                 break
 
         if found_aum is not None and found_aum > 0:
@@ -245,6 +260,8 @@ def fetch_groww_metadata(slug: str) -> dict:
             result["aum_raw"] = f"{found_aum:.2f} Cr"
         if found_expense is not None and 0 < found_expense <= 5:
             result["groww_expense_ratio"] = found_expense
+        if found_manager:
+            result["fund_manager"] = found_manager[:120]
         result["metadata_fetched"] = "aum_cr" in result
     except Exception as e:
         result["metadata_error"] = str(e)
@@ -448,6 +465,9 @@ def fetch_scheme_data(scheme: dict) -> dict:
                 result["metadata_source"] = fallback.get("metadata_source", "Verified metadata snapshot")
             result["metadata_fetched"] = fallback.get("metadata_fetched", True)
             result["metadata_snapshot"] = True
+
+    if not result.get("fund_manager"):
+        result["fund_manager"] = FUND_MANAGER_SNAPSHOT.get(scheme.get("mc_id", ""), "")
 
     mfapi_id = MC_TO_MFAPI.get(scheme.get("mc_id"))
     nav_series = pd.Series(dtype=float)
