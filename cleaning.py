@@ -57,6 +57,7 @@ def fmt_cr(val):
 DISPLAY_COLS = [
     "sr",
     "short_name",
+    "source_url",
     "category",
     "weight",
     "nav",
@@ -83,6 +84,7 @@ DISPLAY_COLS = [
 
 RENAME = {
     "short_name": "Fund",
+    "source_url": "Value Research",
     "category": "Category",
     "weight": "Wt %",
     "nav": "NAV (Rs.)",
@@ -119,6 +121,7 @@ def build_summary_df(all_data: list) -> pd.DataFrame:
         row = {
             "sr": d.get("sr"),
             "short_name": d.get("short_name", d.get("name", "")),
+            "source_url": d.get("vr_url", ""),
             "name": d.get("name", ""),
             "category": d.get("category", ""),
             "weight": d.get("weight"),

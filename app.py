@@ -104,7 +104,7 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 REFRESH_INTERVAL = 300
 REFRESH_INTERVAL_MS = REFRESH_INTERVAL * 1000
 REFRESH_LABEL = "5 min"
-CACHE_VERSION = "manager-stocks-table-v1"
+CACHE_VERSION = "fund-source-links-v1"
 
 # ─── Data loading (cached) ───────────────────────────────────────────────────
 @st.cache_data(ttl=REFRESH_INTERVAL, show_spinner=False)
@@ -372,6 +372,7 @@ with tabs[0]:
     # Portfolio Average Row
     avg_row = {
         "Fund": "PORTFOLIO AVERAGE",
+        "Value Research": "",
         "Category": "",
         "Wt %": "",
         "NAV (Rs.)": round(df["nav"].mean(), 2) if not df["nav"].empty else None,
@@ -391,6 +392,7 @@ with tabs[0]:
     # Portfolio Total Row
     total_row = {
         "Fund": "PORTFOLIO TOTAL",
+        "Value Research": "",
         "Category": "",
         "Wt %": "100%",
         "AUM (Cr)": round(df["aum_cr"].sum(), 0) if not df["aum_cr"].empty else None,
@@ -406,6 +408,12 @@ with tabs[0]:
         height=620,
         column_config={
             "Fund": st.column_config.TextColumn("Fund", width="medium"),
+            "Value Research": st.column_config.LinkColumn(
+                "Value Research",
+                display_text="Open",
+                width="small",
+                help="Open the fund page on Value Research",
+            ),
             "NAV (Rs.)": st.column_config.NumberColumn("NAV (Rs.)", format="Rs. %.2f"),
             "Wt %": st.column_config.NumberColumn("Wt %", format="%d%%"),
         },
