@@ -20,7 +20,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 
 from schemes import SCHEMES, CATEGORY_COLORS
-from ingestion import fetch_scheme_data, get_holdings, fetch_benchmark_data
+from ingestion import fetch_scheme_data, get_holdings, fetch_benchmark_data, fallback_holdings
 from cleaning import (
     build_summary_df, to_display_df,
     compute_overlap_matrix, fmt_pct, fmt_cr
@@ -104,10 +104,11 @@ html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 REFRESH_INTERVAL = 300
 REFRESH_INTERVAL_MS = REFRESH_INTERVAL * 1000
 REFRESH_LABEL = "5 min"
+CACHE_VERSION = "holdings-fallback-v2"
 
 # ─── Data loading (cached) ───────────────────────────────────────────────────
 @st.cache_data(ttl=REFRESH_INTERVAL, show_spinner=False)
-def load_all_data():
+def load_all_data(cache_version=CACHE_VERSION):
     all_data, all_holdings = [], {}
     progress = st.progress(0, text="Fetching live data from all configured URLs...")
     for i, scheme in enumerate(SCHEMES):
@@ -246,6 +247,11 @@ else:
 with st.spinner("Loading live fund data from Value Research…"):
     all_data, all_holdings = load_all_data()
 benchmark_data = load_benchmark_data()
+
+for scheme in SCHEMES:
+    sid = scheme.get("mc_id")
+    if sid and not all_holdings.get(sid, {}).get("top_holdings"):
+        all_holdings[sid] = fallback_holdings(sid)
 
 df = get_summary_df(all_data)
 
