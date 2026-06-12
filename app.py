@@ -20,7 +20,7 @@ import plotly.express as px
 from plotly.subplots import make_subplots
 
 from schemes import SCHEMES, CATEGORY_COLORS
-from ingestion import fetch_scheme_data, get_holdings
+from ingestion import fetch_scheme_data, get_holdings, fetch_benchmark_data
 from cleaning import (
     build_summary_df, to_display_df,
     compute_overlap_matrix, fmt_pct, fmt_cr
@@ -115,7 +115,7 @@ def load_all_data():
                           text=f"Loading {scheme['short_name']}…")
         data = fetch_scheme_data(scheme)
         all_data.append(data)
-        all_holdings[scheme["mc_id"]] = get_holdings(scheme["mc_id"])
+        all_holdings[scheme["mc_id"]] = get_holdings(scheme)
         time.sleep(0.15)
     progress.empty()
     return all_data, all_holdings
@@ -124,6 +124,11 @@ def load_all_data():
 @st.cache_data(ttl=REFRESH_INTERVAL)
 def get_summary_df(all_data):
     return build_summary_df(all_data)
+
+
+@st.cache_data(ttl=REFRESH_INTERVAL, show_spinner=False)
+def load_benchmark_data():
+    return fetch_benchmark_data()
 
 
 # ─── Plotly theme helper ──────────────────────────────────────────────────────
@@ -240,6 +245,7 @@ else:
 # ─── Load data ───────────────────────────────────────────────────────────────
 with st.spinner("Loading live fund data from Value Research…"):
     all_data, all_holdings = load_all_data()
+benchmark_data = load_benchmark_data()
 
 df = get_summary_df(all_data)
 
@@ -526,11 +532,84 @@ with tabs[1]:
 # ─── Tab 3 to 8 ───────────────────────────────────────────────────────────────
 with tabs[2]:
     st.markdown("<div class='section-header'>Fund Flows</div>", unsafe_allow_html=True)
-    st.info("Live fund-flow feed is not configured yet. NAV, returns, CAGR, volatility, and allocation views remain live.")
+    flow_df = df_filtered[["short_name", "category", "weight", "ret_1m", "ret_3m", "ret_6m", "ret_1y"]].copy()
+    for col_name in ["weight", "ret_1m", "ret_3m", "ret_6m", "ret_1y"]:
+        flow_df[f"{col_name}_num"] = num_col(flow_df, col_name)
+    flow_df["1M Flow Score"] = flow_df["weight_num"] * flow_df["ret_1m_num"] / 100
+    flow_df["3M Flow Score"] = flow_df["weight_num"] * flow_df["ret_3m_num"] / 100
+    flow_df["6M Flow Score"] = flow_df["weight_num"] * flow_df["ret_6m_num"] / 100
+    flow_df["1Y Flow Score"] = flow_df["weight_num"] * flow_df["ret_1y_num"] / 100
+    score_cols = ["1M Flow Score", "3M Flow Score", "6M Flow Score", "1Y Flow Score"]
+    flow_summary = [
+        ("1M Net Flow Proxy", fmt_signed_pct(flow_df["1M Flow Score"].sum()), "weight x live NAV return"),
+        ("3M Net Flow Proxy", fmt_signed_pct(flow_df["3M Flow Score"].sum()), "weight x live NAV return"),
+        ("6M Net Flow Proxy", fmt_signed_pct(flow_df["6M Flow Score"].sum()), "weight x live NAV return"),
+        ("1Y Net Flow Proxy", fmt_signed_pct(flow_df["1Y Flow Score"].sum()), "weight x live NAV return"),
+    ]
+    render_metric_grid(flow_summary, columns=4)
+    flow_view = flow_df.rename(columns={
+        "short_name": "Fund",
+        "category": "Category",
+        "weight": "Wt %",
+        "ret_1m": "1M Ret",
+        "ret_3m": "3M Ret",
+        "ret_6m": "6M Ret",
+        "ret_1y": "1Y Ret",
+    })[["Fund", "Category", "Wt %", "1M Ret", "3M Ret", "6M Ret", "1Y Ret", *score_cols]]
+    st.dataframe(flow_view, use_container_width=True, hide_index=True)
+    flow_chart = flow_df.dropna(subset=["3M Flow Score"]).sort_values("3M Flow Score", ascending=False)
+    if not flow_chart.empty:
+        fig = px.bar(
+            flow_chart,
+            x="3M Flow Score",
+            y="short_name",
+            color="category",
+            orientation="h",
+            labels={"short_name": "Fund", "3M Flow Score": "3M Flow Proxy (%)"},
+            color_discrete_map=CATEGORY_COLORS,
+        )
+        st.plotly_chart(apply_theme(fig), use_container_width=True)
+    st.caption("This is a live model-flow proxy from NAV returns and portfolio weights, not AMC subscription/redemption flow data.")
 
 with tabs[3]:
     st.markdown("<div class='section-header'>Stock Movements</div>", unsafe_allow_html=True)
-    st.info("Live stock movement data needs a holdings disclosure feed per scheme. No manual or fake movements are shown.")
+    holdings_rows = []
+    for scheme in filtered_data:
+        sid = scheme.get("mc_id")
+        for stock, pct in all_holdings.get(sid, {}).get("top_holdings", []):
+            holdings_rows.append({
+                "Fund": scheme.get("short_name"),
+                "Category": scheme.get("category"),
+                "Stock": stock,
+                "Holding %": pct,
+                "Weighted Exposure": pct * scheme.get("weight", 0) / 100,
+            })
+    holdings_df = pd.DataFrame(holdings_rows)
+    if holdings_df.empty:
+        st.warning("Holdings could not be fetched from the source pages in this run.")
+    else:
+        exposure = (
+            holdings_df.groupby("Stock", as_index=False)
+            .agg({"Weighted Exposure": "sum", "Fund": "nunique"})
+            .rename(columns={"Fund": "Funds Holding"})
+            .sort_values("Weighted Exposure", ascending=False)
+        )
+        stock_cols = st.columns([1, 1])
+        with stock_cols[0]:
+            st.markdown("<div class='section-header'>Top Portfolio Stock Exposures</div>", unsafe_allow_html=True)
+            st.dataframe(exposure.head(20), use_container_width=True, hide_index=True)
+        with stock_cols[1]:
+            fig = px.bar(
+                exposure.head(15),
+                x="Weighted Exposure",
+                y="Stock",
+                orientation="h",
+                color="Funds Holding",
+                labels={"Weighted Exposure": "Weighted Exposure (%)"},
+            )
+            st.plotly_chart(apply_theme(fig), use_container_width=True)
+        st.markdown("<div class='section-header'>Latest Top Holdings By Fund</div>", unsafe_allow_html=True)
+        st.dataframe(holdings_df.sort_values(["Fund", "Holding %"], ascending=[True, False]), use_container_width=True, hide_index=True)
 
 with tabs[4]:
     st.markdown("<div class='section-header'>Overlap Matrix</div>", unsafe_allow_html=True)
@@ -538,13 +617,55 @@ with tabs[4]:
     has_holdings = any(all_holdings.get(sid, {}).get("top_holdings") for sid in scheme_ids)
     if has_holdings:
         overlap = compute_overlap_matrix(all_holdings, scheme_ids)
+        name_map = {d.get("mc_id"): d.get("short_name") for d in filtered_data}
+        overlap = overlap.rename(index=name_map, columns=name_map)
+        fig = px.imshow(
+            overlap.astype(float),
+            text_auto=True,
+            color_continuous_scale="Blues",
+            labels=dict(color="Overlap %"),
+        )
+        st.plotly_chart(apply_theme(fig), use_container_width=True)
         st.dataframe(overlap, use_container_width=True)
     else:
         st.info("Holdings feed is not configured yet, so stock overlap is not calculated. Category allocation and risk-return views are still live.")
 
 with tabs[5]:
     st.markdown("<div class='section-header'>Benchmark</div>", unsafe_allow_html=True)
-    st.info("Benchmark API is not configured yet. This tab will remain empty instead of showing static/manual benchmark numbers.")
+    if not benchmark_data.get("fetched"):
+        st.warning("Benchmark feed could not be fetched in this run.")
+    else:
+        bench_items = [
+            ("Benchmark", benchmark_data["label"], benchmark_data.get("latest_date", "")),
+            ("Latest Level", f"{benchmark_data.get('latest'):,.2f}", benchmark_data.get("symbol", "")),
+            ("1Y Return", fmt_signed_pct(benchmark_data.get("ret_1y")), "live benchmark"),
+            ("3Y CAGR", fmt_signed_pct(benchmark_data.get("cagr_3y")), "live benchmark"),
+            ("5Y CAGR", fmt_signed_pct(benchmark_data.get("cagr_5y")), "live benchmark"),
+            ("Std Dev", fmt_pct(benchmark_data.get("std_dev"), 2), "annualised"),
+        ]
+        render_metric_grid(bench_items, columns=3)
+        comp_rows = []
+        for label, fund_col, bench_key in [
+            ("1Y Return", "ret_1y", "ret_1y"),
+            ("3Y CAGR", "cagr_3y", "cagr_3y"),
+            ("5Y CAGR", "cagr_5y", "cagr_5y"),
+        ]:
+            fund_val = weighted_mean(df_filtered, fund_col)
+            bench_val = benchmark_data.get(bench_key)
+            comp_rows.append({
+                "Metric": label,
+                "Portfolio": fund_val,
+                "Benchmark": bench_val,
+                "Alpha": None if fund_val is None or bench_val is None else fund_val - bench_val,
+            })
+        comp_df = pd.DataFrame(comp_rows)
+        st.dataframe(comp_df, use_container_width=True, hide_index=True)
+        series = benchmark_data.get("series", pd.Series(dtype=float))
+        if not series.empty:
+            bench_plot = series.tail(252).reset_index()
+            bench_plot.columns = ["Date", "Level"]
+            fig = px.line(bench_plot, x="Date", y="Level", title="Nifty 50 - Last 1 Year")
+            st.plotly_chart(apply_theme(fig), use_container_width=True)
 
 with tabs[6]:
     st.markdown("<div class='section-header'>Risk Analysis</div>", unsafe_allow_html=True)

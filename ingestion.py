@@ -24,6 +24,7 @@ SESSION = requests.Session()
 SESSION.headers.update(HEADERS)
 
 MFAPI_DETAIL = "https://api.mfapi.in/mf/{}"
+YAHOO_CHART = "https://query1.finance.yahoo.com/v8/finance/chart/{}"
 
 SCHEME_URL_FIELDS = (
     "vr_url",
@@ -193,6 +194,77 @@ def compute_risk_metrics(series: pd.Series) -> dict:
     std_dev = round(daily_ret.std() * (252 ** 0.5) * 100, 2)
     return {"std_dev": std_dev}
 
+def parse_top_holdings_from_valueresearch(vr_portfolio_url: str) -> dict:
+    result = {
+        "top_holdings": [],
+        "num_stocks": 0,
+        "holdings_source": "Value Research",
+        "holdings_fetched": False,
+    }
+    if not vr_portfolio_url:
+        return result
+
+    try:
+        r = _get(vr_portfolio_url)
+        soup = BeautifulSoup(r.text, "html.parser")
+        heading = soup.find(string=re.compile(r"What are the top holdings", re.I))
+        table = heading.find_parent().find_next("table") if heading else None
+        if not table:
+            return result
+
+        holdings = []
+        for tr in table.select("tbody tr"):
+            tds = tr.find_all("td")
+            if len(tds) < 2:
+                continue
+            name = re.sub(r"\s+", " ", tds[0].get_text(" ", strip=True))
+            pct_text = tds[1].get_text(" ", strip=True)
+            pct_match = re.search(r"[-+]?\d+\.?\d*", pct_text)
+            if not name or not pct_match:
+                continue
+            holdings.append((name, float(pct_match.group(0))))
+
+        result["top_holdings"] = holdings
+        result["num_stocks"] = len(holdings)
+        result["holdings_fetched"] = bool(holdings)
+    except Exception as e:
+        result["holdings_error"] = str(e)
+        logger.warning(f"Holdings failed {vr_portfolio_url}: {e}")
+    return result
+
+def yahoo_series(symbol: str, years: int = 5) -> pd.Series:
+    try:
+        url = YAHOO_CHART.format(symbol)
+        r = _get(f"{url}?range={years}y&interval=1d")
+        payload = r.json()
+        result = payload.get("chart", {}).get("result", [{}])[0]
+        timestamps = result.get("timestamp", [])
+        closes = result.get("indicators", {}).get("quote", [{}])[0].get("close", [])
+        if not timestamps or not closes:
+            return pd.Series(dtype=float)
+        idx = pd.to_datetime(timestamps, unit="s").tz_localize("UTC").tz_convert(None).normalize()
+        series = pd.Series(closes, index=idx, dtype=float).dropna().sort_index()
+        return series[~series.index.duplicated(keep="last")]
+    except Exception as e:
+        logger.warning(f"Benchmark failed {symbol}: {e}")
+        return pd.Series(dtype=float)
+
+def fetch_benchmark_data(symbol: str = "%5ENSEI", label: str = "Nifty 50") -> dict:
+    series = yahoo_series(symbol)
+    latest = series.iloc[-1] if not series.empty else None
+    latest_date = series.index[-1].strftime("%d %b %Y") if not series.empty else None
+    data = {
+        "label": label,
+        "symbol": symbol,
+        "latest": round(latest, 2) if latest is not None else None,
+        "latest_date": latest_date,
+        "fetched": not series.empty,
+        "series": series,
+    }
+    data.update(compute_returns(series))
+    data.update(compute_risk_metrics(series))
+    return data
+
 def fetch_scheme_data(scheme: dict) -> dict:
     fetched_at = datetime.now()
     result = {
@@ -222,5 +294,7 @@ def fetch_scheme_data(scheme: dict) -> dict:
 
     return result
 
-def get_holdings(mc_id: str) -> dict:
+def get_holdings(scheme_or_id) -> dict:
+    if isinstance(scheme_or_id, dict):
+        return parse_top_holdings_from_valueresearch(scheme_or_id.get("vr_portfolio", ""))
     return {"top_holdings": [], "sector": [], "market_cap": [], "num_stocks": 0, "cash_pct": 0.0}
