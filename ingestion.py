@@ -14,6 +14,8 @@ import pandas as pd
 import numpy as np
 from tenacity import retry, stop_after_attempt, wait_exponential
 
+from holdings_snapshot import HOLDINGS_SNAPSHOT
+
 logger = logging.getLogger(__name__)
 
 HEADERS = {
@@ -294,7 +296,27 @@ def fetch_scheme_data(scheme: dict) -> dict:
 
     return result
 
+def fallback_holdings(mc_id: str) -> dict:
+    snapshot = HOLDINGS_SNAPSHOT.get(mc_id, {})
+    holdings = snapshot.get("top_holdings", [])
+    return {
+        "top_holdings": holdings,
+        "sector": [],
+        "market_cap": [],
+        "num_stocks": len(holdings),
+        "cash_pct": 0.0,
+        "holdings_source": "Value Research snapshot",
+        "holdings_source_url": snapshot.get("source_url", ""),
+        "holdings_fetched": bool(holdings),
+        "holdings_snapshot": True,
+    }
+
 def get_holdings(scheme_or_id) -> dict:
     if isinstance(scheme_or_id, dict):
-        return parse_top_holdings_from_valueresearch(scheme_or_id.get("vr_portfolio", ""))
-    return {"top_holdings": [], "sector": [], "market_cap": [], "num_stocks": 0, "cash_pct": 0.0}
+        live = parse_top_holdings_from_valueresearch(scheme_or_id.get("vr_portfolio", ""))
+        if live.get("top_holdings"):
+            live["holdings_source_url"] = scheme_or_id.get("vr_portfolio", "")
+            live["holdings_snapshot"] = False
+            return live
+        return fallback_holdings(scheme_or_id.get("mc_id", ""))
+    return fallback_holdings(str(scheme_or_id))

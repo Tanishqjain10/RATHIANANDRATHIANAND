@@ -576,13 +576,15 @@ with tabs[3]:
     holdings_rows = []
     for scheme in filtered_data:
         sid = scheme.get("mc_id")
-        for stock, pct in all_holdings.get(sid, {}).get("top_holdings", []):
+        holding_info = all_holdings.get(sid, {})
+        for stock, pct in holding_info.get("top_holdings", []):
             holdings_rows.append({
                 "Fund": scheme.get("short_name"),
                 "Category": scheme.get("category"),
                 "Stock": stock,
                 "Holding %": pct,
                 "Weighted Exposure": pct * scheme.get("weight", 0) / 100,
+                "Source": holding_info.get("holdings_source", "Value Research"),
             })
     holdings_df = pd.DataFrame(holdings_rows)
     if holdings_df.empty:
@@ -610,6 +612,8 @@ with tabs[3]:
             st.plotly_chart(apply_theme(fig), use_container_width=True)
         st.markdown("<div class='section-header'>Latest Top Holdings By Fund</div>", unsafe_allow_html=True)
         st.dataframe(holdings_df.sort_values(["Fund", "Holding %"], ascending=[True, False]), use_container_width=True, hide_index=True)
+        snapshot_count = sum(1 for h in all_holdings.values() if h.get("holdings_snapshot"))
+        st.caption(f"Holdings source: Value Research pages with snapshot fallback. Snapshot fallback used for {snapshot_count}/{len(all_holdings)} funds in this run.")
 
 with tabs[4]:
     st.markdown("<div class='section-header'>Overlap Matrix</div>", unsafe_allow_html=True)

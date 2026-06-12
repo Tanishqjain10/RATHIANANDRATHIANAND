@@ -1,0 +1,156 @@
+HOLDINGS_SNAPSHOT = {
+    "MES082": {
+        "fund": "Quant Large Cap",
+        "source_url": "https://www.valueresearchonline.com/funds/42367/quant-large-cap-fund-direct-plan/#fund-portfolio",
+        "top_holdings": [
+            ("Adani Green Energy", 9.82),
+            ("Adani Enterprises", 9.24),
+            ("Samvardhana Motherson", 8.73),
+            ("ICICI Bank", 8.53),
+            ("ICICI Prudential Asset Management", 7.35),
+        ],
+    },
+    "MSB501": {
+        "fund": "SBI Large & Midcap",
+        "source_url": "https://www.valueresearchonline.com/funds/16240/sbi-large-midcap-fund-direct-plan/#fund-portfolio",
+        "top_holdings": [
+            ("HDFC Bank", 7.18),
+            ("Axis Bank", 3.30),
+            ("Bharat Forge", 3.23),
+            ("SBI", 2.81),
+            ("ICICI Bank", 2.65),
+        ],
+    },
+    "MDS580": {
+        "fund": "DSP Large & Mid Cap",
+        "source_url": "https://www.valueresearchonline.com/funds/16425/dsp-large-mid-cap-fund-direct-plan/#fund-portfolio",
+        "top_holdings": [
+            ("ICICI Bank", 8.62),
+            ("HDFC Bank", 8.13),
+            ("Axis Bank", 5.81),
+            ("SBI", 2.79),
+            ("Kotak Bank", 2.63),
+        ],
+    },
+    "MAG091": {
+        "fund": "Bandhan L&M Cap",
+        "source_url": "https://www.valueresearchonline.com/funds/16474/bandhan-large-mid-cap-fund-direct-plan/#fund-portfolio",
+        "top_holdings": [
+            ("HDFC Bank", 3.64),
+            ("SBI", 2.77),
+            ("ICICI Bank", 2.69),
+            ("One97 Comm", 2.55),
+            ("Axis Bank", 2.49),
+        ],
+    },
+    "MKM099": {
+        "fund": "Kotak Midcap",
+        "source_url": "https://www.valueresearchonline.com/funds/17134/kotak-midcap-fund-direct-plan/#fund-portfolio",
+        "top_holdings": [
+            ("GE Vernova T&D", 4.22),
+            ("Fortis Healthcare", 4.03),
+            ("KEI", 2.98),
+            ("Ipca Laboratories", 2.91),
+            ("Mphasis", 2.79),
+        ],
+    },
+    "INVESCO_SC": {
+        "fund": "Invesco Smallcap",
+        "source_url": "https://www.valueresearchonline.com/funds/37843/invesco-india-smallcap-fund-direct-plan/#fund-portfolio",
+        "top_holdings": [
+            ("Sai Life Sciences", 4.89),
+            ("Amber Enterprises", 4.85),
+            ("Aditya Infotech", 4.14),
+            ("Krishna Institute", 4.12),
+            ("Max Healthcare", 3.77),
+        ],
+    },
+    "MMS025": {
+        "fund": "HDFC Small Cap",
+        "source_url": "https://www.valueresearchonline.com/funds/16617/hdfc-small-cap-fund-direct-plan/#fund-portfolio",
+        "top_holdings": [
+            ("Firstsource", 3.92),
+            ("Aster Dm Health", 3.80),
+            ("Bank Of Baroda", 3.24),
+            ("Gabriel India", 2.77),
+            ("eClerx Services", 2.45),
+        ],
+    },
+    "MHD1144": {
+        "fund": "HDFC Flexi Cap",
+        "source_url": "https://www.valueresearchonline.com/funds/16026/hdfc-flexi-cap-fund-direct-plan/#fund-portfolio",
+        "top_holdings": [
+            ("ICICI Bank", 8.83),
+            ("Axis Bank", 6.84),
+            ("HDFC Bank", 6.48),
+            ("SBI", 4.22),
+            ("SBI Life Insurance", 3.76),
+        ],
+    },
+    "MKM1397": {
+        "fund": "Kotak Multicap",
+        "source_url": "https://www.valueresearchonline.com/funds/41707/kotak-multicap-fund-direct-plan/#fund-portfolio",
+        "top_holdings": [
+            ("Maruti Suzuki", 4.35),
+            ("Indus Towers", 3.92),
+            ("Hero Motocorp", 3.50),
+            ("IndusInd Bank", 3.48),
+            ("Radico Khaitan", 3.15),
+        ],
+    },
+    "MCAA002": {
+        "fund": "Canara Rob Multicap",
+        "source_url": "https://www.valueresearchonline.com/funds/43569/canara-robeco-multi-cap-fund-regular-plan/#fund-portfolio",
+        "top_holdings": [
+            ("HDFC Bank", 4.39),
+            ("ICICI Bank", 3.62),
+            ("Bharti Airtel", 2.61),
+            ("SBI", 2.15),
+            ("Larsen & Toubro", 2.09),
+        ],
+    },
+    "MSB520": {
+        "fund": "SBI Infrastructure",
+        "source_url": "https://www.valueresearchonline.com/funds/17161/sbi-infrastructure-fund-direct-plan/#fund-portfolio",
+        "top_holdings": [
+            ("Reliance Ind", 9.92),
+            ("Bharti Airtel", 6.86),
+            ("Larsen & Toubro", 5.95),
+            ("Shree Cement", 5.27),
+            ("Adani Ports", 4.52),
+        ],
+    },
+    "MPI643": {
+        "fund": "ICICI Pru Focused",
+        "source_url": "https://www.valueresearchonline.com/funds/17412/icici-prudential-focused-equity-fund-direct-plan/#fund-portfolio",
+        "top_holdings": [
+            ("ICICI Bank", 8.07),
+            ("Axis Bank", 6.68),
+            ("TVS Motor", 5.21),
+            ("HDFC Bank", 4.95),
+            ("Adani Ports", 4.60),
+        ],
+    },
+    "MLI1122": {
+        "fund": "Invesco Focused",
+        "source_url": "https://www.valueresearchonline.com/funds/41096/invesco-india-focused-fund-direct-plan/#fund-portfolio",
+        "top_holdings": [
+            ("ICICI Bank", 8.94),
+            ("Larsen & Toubro", 7.80),
+            ("HDFC Bank", 6.72),
+            ("Interglobe Aviation", 5.78),
+            ("Nuvama Wealth Mgmt", 5.27),
+        ],
+    },
+    "MPI2056": {
+        "fund": "ICICI Pru Div Yield",
+        "source_url": "https://www.valueresearchonline.com/funds/26271/icici-prudential-dividend-yield-equity-fund-direct-plan/#fund-portfolio",
+        "top_holdings": [
+            ("HDFC Bank", 7.15),
+            ("ICICI Bank", 5.99),
+            ("Sun Pharmaceutical", 5.82),
+            ("Axis Bank", 4.63),
+            ("Reliance Ind", 4.19),
+        ],
+    },
+}
